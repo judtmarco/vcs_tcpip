@@ -1,4 +1,5 @@
 /**
+/*
  * @file simple_message_client.c
  * VCS TCP/IP Aufgabe 2: Implementierung Client
  *
@@ -34,4 +35,6 @@ int main (void)
     return EXIT_SUCCESS;
 }
 
-/* eof */
+/*
+ * =================================================================== eof ==
+ */
