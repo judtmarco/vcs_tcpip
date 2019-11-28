@@ -1,0 +1,37 @@
+##
+## Makefile für simple_message_client
+## BIC-3 Verteilte Systeme 
+## TCP-IP
+##
+## Beschreibung:
+## 		- Compilieren des C-File: "$ make all".
+## 		- Löschen des Objectfile: "$ make clean".
+##		- Löschen des Executeables und des Objectfile: "$ make cleanexe".
+##
+## Current C-Files:
+## 		-  simple_message_client.c
+##		
+
+## ----------- Variablen -----------
+
+CC=gcc
+CFLAGS= -Wall -Werror -Wextra -Wstrict-prototypes -Wformat=2 -pedantic -fno-common -ftrapv -O3 -g -std=gnu11
+RM=rm
+
+
+## ---------- make all --------------
+all: compile
+
+compile: $(CC) simple_message_client.o -o  simple_message_client
+
+simple_message_client.o: simple_message_client.c 
+		$(CC) $(CFLAGS) simple_message_client.c
+
+		
+## --------- make clean -------------
+clean:
+		$(RM) -rf *.o
+
+## --------- make cleanexe ----------		
+cleanexe:
+		$(RM) -rf *.o simple_message_client
