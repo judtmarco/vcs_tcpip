@@ -8,6 +8,8 @@
  * @git https://github.com/judtmarco/vcs_tcpip
  * @date 11/25/2019
  * @version 1.0
+ *
+ * @TODO parse arguments with getopt
  */
 
 /*
@@ -17,6 +19,9 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
+#include <unistd.h>
+#include <getopt.h>
+
 
 /*
  * --------------------------------------------------------------- defines --
@@ -50,6 +55,31 @@ int main (const int argc, char* const argv[])
         usage();
         // TODO: Close Sockets
         return EXIT_FAILURE;
+    }
+
+    // Parse command line arguments with getopt
+    int opt;
+    static struct option long_options[] = {
+            {"port",     required_argument, 0,  'p' },
+            {"help",  no_argument,       0,  'h' },
+            {NULL,  0, 0,  0 }
+    };
+
+    while ((opt = getopt_long(argc, argv, "p:h",long_options, NULL)) != -1) {
+        switch (opt) {
+            case 'p':
+                // TODO: -p
+                printf("-p is in work ...\n");
+                break;
+            case 'h':
+                usage();
+                exit(EXIT_FAILURE);
+                break;
+            default:
+                usage();
+                exit(EXIT_FAILURE);
+                break;
+        }
     }
 
     return EXIT_SUCCESS;
