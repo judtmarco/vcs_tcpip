@@ -26,8 +26,9 @@
 /*
  * --------------------------------------------------------------- defines --
  */
-#define LISTEN_BACKLOG 50
+#define LISTEN_BACKLOG 30
 #define MAX_PORTNUMBER 65536
+#define MIN_PORTNUMBER 1023
 #define ERROR -1
 
 /*
@@ -44,13 +45,12 @@ int socket_fd = 0;
  * ------------------------------------------------------------- prototypes --
  */
 static void usage(void);
-static void error_exit (int error, char* message, int socket_fd);
+static void exit_on_error (int error, char* message);
 static int create_socket (char *port);
 
 /*
  * ------------------------------------------------------------- functions --
  */
-
 /**
 * \brief
 *
@@ -72,25 +72,25 @@ int main (const int argc, char* const argv[])
     int opt = 0;
     long int port = 0;
     char *strtol_ptr = NULL;
-    char portstring [6];
     static struct option long_options[] = {
             {"port",  required_argument, 0,  'p' },
             {"help",  no_argument,       0,  'h' },
             {NULL,  0, 0,  0 }
     };
 
-    while ((opt = getopt_long(argc, argv, "p:h", long_options, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "p:h", long_options, NULL)) != ERROR) {
         switch (opt) {
             case 'p':
                 errno = 0;
                 port = strtol(optarg, &strtol_ptr, 10);
                 if (errno != 0) {
-                    error_exit(errno, "strtol() failed", 0);
+                    exit_on_error(errno, "strtol() failed");
                 }
-                if(port <= 0 || port >= MAX_PORTNUMBER || *strtol_ptr != '\0') {
-                    error_exit(0, "port is invalid", 0);
+                if(port <= MIN_PORTNUMBER || port >= MAX_PORTNUMBER || *strtol_ptr != '\0') {
+                    exit_on_error(0, "port is invalid");
                 }
-                strcpy (portstring, optarg);
+                // Create and setup a socket
+                socket_fd = create_socket(optarg);
                 break;
             case 'h':
                 usage();
@@ -103,16 +103,48 @@ int main (const int argc, char* const argv[])
         }
     }
 
-    // Create and setup a socket
-    socket_fd = create_socket(portstring);
+    // TODO: Initializing signal handler for child process
 
+    // Loop for incoming connections from client
+    socklen_t client_addr_size;
+    struct sockaddr_storage client_addr;
+    int new_fd = 0;
+    while (1) {
+        client_addr_size = sizeof(client_addr);
+
+        errno = 0;
+        new_fd = accept(socket_fd, (struct sockaddr *) &client_addr, &client_addr_size);
+        if (new_fd == ERROR) {
+            close (new_fd);
+            exit_on_error(errno, "accept() failed");
+        }
+
+        errno = 0;
+        pid_t cpid = fork();
+        if (cpid == ERROR) {
+            close (new_fd);
+            exit_on_error(errno, "fork() failed");
+        }
+
+        // Child
+        if (cpid == 0) {
+            close (socket_fd);
+            // TODO: Duplicating client socket
+            // TODO: Redirect stdin and stdout of forked child daemon to connected socket
+        }
+        // Parent
+        else {
+            close (new_fd);
+        }
+
+    }
     return EXIT_SUCCESS;
 }
 
 /**
 * \brief Error message for usage of simple_message_server
 *
-* Prints an messege on how to use the program.
+* Prints an message on how to use the program.
 *
 \param void
 \return void
@@ -124,7 +156,7 @@ static void usage(void)
                "\t-p, --port <port>\n"
                "\t-h, --help\n" , prog_name) < 0)
     {
-        error_exit(errno, "printf() failed", 0);
+        exit_on_error(errno, "printf() failed");
     }
 }
 
@@ -135,7 +167,7 @@ static void usage(void)
 \param
 \return void
 */
-static void error_exit (int error, char* message, int socket_fd) {
+static void exit_on_error (int error, char* message) {
     if (socket_fd != 0) {
         close(socket_fd);
     }
@@ -163,7 +195,7 @@ static int create_socket (char *port) {
 
     memset(&hints, 0, sizeof(struct addrinfo));
     hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
-    hints.ai_socktype = SOCK_STREAM; /* Datagram socket */
+    hints.ai_socktype = SOCK_STREAM; /* Bytestream socket */
     hints.ai_flags = AI_PASSIVE;    /* For wildcard IP address */
     hints.ai_protocol = 0;          /* Any protocol */
     hints.ai_canonname = NULL;
@@ -173,25 +205,25 @@ static int create_socket (char *port) {
     errno = 0;
     ret_getaddrinfo = getaddrinfo(NULL, port, &hints, &result);
     if (ret_getaddrinfo != 0) {
-        error_exit(errno, "getaddrinfo() failed", 0);
+        exit_on_error(errno, "getaddrinfo() failed");
     }
 
     errno = 0;
     socket_fd = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
     if (socket_fd == ERROR) {
-        error_exit(errno, "socket() failed", socket_fd);
+        exit_on_error(errno, "socket() failed");
     }
 
     errno = 0;
     ret_bind = bind(socket_fd, result->ai_addr, result->ai_addrlen);
     if (ret_bind != 0) {
-        error_exit(errno, "bind() failed", socket_fd);
+        exit_on_error(errno, "bind() failed");
     }
 
     errno = 0;
     ret_listen = listen(socket_fd, LISTEN_BACKLOG);
     if (ret_listen != 0) {
-        error_exit(errno, "listen() failed", socket_fd);
+        exit_on_error(errno, "listen() failed");
     }
 
     return socket_fd;
