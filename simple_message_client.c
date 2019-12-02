@@ -38,8 +38,10 @@
  */
 
 // This variable is just do get feedback from the cliet-application, when running on annuminas.
-
 bool feedback = true;
+
+FILE *fp_for_write;
+FILE *fp_for_read;
 
 /*
  * -------------------------------------------------------- PROTOTYPES -------------------------------------------------
@@ -49,7 +51,7 @@ void parse_Command(int argc, const char *argv[], const char **server, const char
 void print_Manuel (FILE *fp , const char *program_name , int exit_value);
 int connect_With_Server(const char *server_address, const char *server_port);
 int send_Message_To_Server(int socket_file_descriptor, const char *message, const char *user, const char *img_url);
-int read_Message_From_Server(int socket_file_descriptor);
+int receive_Message_From_Server(int socket_file_descriptor);
 
 
 /*
@@ -58,7 +60,7 @@ int read_Message_From_Server(int socket_file_descriptor);
 
 int main (int argc, const char *argv []) {
 
-  
+
 
 
 
@@ -69,11 +71,8 @@ int main (int argc, const char *argv []) {
  * -------------------------------------------------------- FUNCTIONS --------------------------------------------------
  */
 
-int read_Message_From_Server (int socket_file_descriptor){
-
-    char *buffer = calloc(1 ,BUF_SIZE);
-    long offset = 0;
-
+int receive_Message_From_Server (int socket_file_descriptor){
+    
 
 
 }
@@ -83,82 +82,73 @@ int read_Message_From_Server (int socket_file_descriptor){
 
 int send_Message_To_Server(int socket_file_descriptor, const char *message, const char *user, const char *img_url){
 
-    size_t length_user_segment = strlen(user) + 6;                  /* get the size of the user, +6 for "user=" */
-    char *user_segment = malloc(length_user_segment + 1);      /* allocate the size of user, +1 for nullcharacter */
+    size_t length_of_message;
 
-    size_t length_imgurl_segment;
-    char *imgurl_segment;
+    fp_for_write = fdopen(socket_file_descriptor,"w");
 
-    size_t length_of_message = strlen(message);
 
-    // ----------------------------------------------------- USER
-    if (feedback) {
-        printf("function: send_Message_To_Server | trying: sending username to server\n");
-    }
+    // Sending message without img-URL
 
-    if (sprintf(user_segment, "user=%s\n", user) < 0) {               /* writing the user-info in the right format into the string user segment */
-
-        fprintf(stderr, "failed to write into usersegment\n");
-        free(user_segment);
-        return -1;
-    }
-
-    if (send(socket_file_descriptor, user_segment, length_user_segment, 0) == -1){
-
-        fprintf(stderr, "failed sending username to server\n");
-        free(user_segment);
-        return -1;
-    }
-
-    free(user_segment);
-
-    // ----------------------------------------------------IMAGE-URL
-    if (feedback) {
-        printf("function: send_Message_To_Server | successful sending username to server\n");
-    }
-
-    if (img_url != NULL){
+    if (img_url == NULL){
 
         if (feedback) {
-            printf("function: send_Message_To_Server | trying: sending to image url to server\n");
+            printf("function: send_Message_To_Server | trying: sending message without img-url to server\n");
         }
 
-        length_imgurl_segment = strlen(img_url) + 5;                                 /* get the size of the img_url, +5 for "user=" */
-        imgurl_segment = malloc(length_imgurl_segment + 1);                     /* allocate the size of img_url, +1 for nullcharacter */
+        if (fprintf(fp_for_write, "user=%s\n%s", user, message) < 0) {
 
-        if (sprintf(imgurl_segment, "img=%s\n", img_url) < 0) {               /* writing the image-url in the right format into the string imgurl_segment */
-
-            fprintf(stderr, "failed to write into image-url-segment\n");
-            free(imgurl_segment);
+            fprintf(stderr, "failed to write into file\n");
+            fclose(fp_for_write);
             return -1;
         }
 
-        if (send(socket_file_descriptor, imgurl_segment, length_imgurl_segment, 0) == -1){
+        // FLUSH !!
 
-            fprintf(stderr, "failed sending image-Url to server\n");
-            free(imgurl_segment);
+        if ((length_of_message = strlen(fp_for_write)) == 0) {
+
+            fprintf(stderr, "failed calculation lenght of message \n");
+            fclose(fp_for_write);
             return -1;
         }
 
-        free(imgurl_segment);
+
 
         if (feedback) {
-            printf("function: send_Message_To_Server | sending image url to server successful\n trying sending message");
+            printf("function: send_Message_To_Server | seccussful sending message without img-url to server\n");
         }
+
+     // Sending message with img-URL
+
+    } else {
+
+        if (feedback) {
+            printf("function: send_Message_To_Server | trying: sending message with img-url to server\n");
+        }
+
+        if (fprintf(fp_for_write, "user=%s\nimg=%s\n%s", user, img_url, message) < 0) {
+
+            fprintf(stderr, "failed to write into file\n");
+            fclose(fp_for_write);
+            return -1;
+        }
+
+        // FLUSH!!
+
+        if ((length_of_message = strlen(fp_for_write)) == 0) {
+
+            fprintf(stderr, "failed calculation lenght of message \n");
+            fclose(fp_for_write);
+            return -1;
+        }
+
+
+        if (feedback) {
+            printf("function: send_Message_To_Server | seccussful sending message with img-url to server\n");
+        }
+
     }
 
-    // -------------------------------------------------MESSAGE
 
-    if (send(socket_file_descriptor, message, length_of_message, 0) == -1){
-
-        fprintf(stderr, "failed sending message to server\n");
-        free(imgurl_segment);
-        return -1;
-    }
-
-    if (feedback) {
-        printf("function: send_Message_To_Server | successful sending message to server\n");
-    }
 }
 
 int connect_With_Server(const char *server_address, const char *server_port) {
@@ -256,3 +246,5 @@ void print_Manuel (FILE *fp , const char *program_name , int exit_value) {
 
     exit(exit_value);
 }
+
+
