@@ -22,6 +22,8 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <signal.h>
+#include <sys/wait.h>
 
 /*
  * --------------------------------------------------------------- defines --
@@ -47,6 +49,7 @@ int socket_fd = 0;
 static void usage(void);
 static void exit_on_error (int error, char* message);
 static int create_socket (char *port);
+static void sigchild_handler (int sig);
 
 /*
  * ------------------------------------------------------------- functions --
@@ -90,7 +93,6 @@ int main (const int argc, char* const argv[])
                     exit_on_error(0, "port is invalid");
                 }
                 // Create and setup a socket
-                printf("Port checked ...\n");
                 socket_fd = create_socket(optarg);
                 break;
             case 'h':
@@ -104,13 +106,22 @@ int main (const int argc, char* const argv[])
         }
     }
 
-    // TODO: Initializing signal handler for child process
+    // Initializing signal handler for child process
+    struct sigaction sa;
+    sa.sa_handler = sigchild_handler; // reap all dead processes
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART;
+
+    errno = 0;
+    int ret_sigaction = sigaction(SIGCHLD, &sa, NULL);
+    if (ret_sigaction == ERROR) {
+        exit_on_error(errno, "sigaction() failed");
+    }
 
     // Loop for incoming connections from client
     socklen_t client_addr_size;
     struct sockaddr_storage client_addr;
     int new_fd = 0;
-    printf("Wait for incoming connections ...\n");
     while (1) {
         client_addr_size = sizeof(client_addr);
 
@@ -163,6 +174,7 @@ int main (const int argc, char* const argv[])
         }
 
     }
+    /* Never reach this */
     return EXIT_SUCCESS;
 }
 
@@ -246,14 +258,28 @@ static int create_socket (char *port) {
     }
 
     errno = 0;
+    int yes = 1;
+    int ret_sockopt = setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int));
+    if (ret_sockopt == ERROR) {
+        exit_on_error(errno, "setsockopt() failed");
+    }
+
+    errno = 0;
     ret_listen = listen(socket_fd, LISTEN_BACKLOG);
     if (ret_listen != 0) {
         exit_on_error(errno, "listen() failed");
     }
 
-    printf("Socket created ...\n");
-
     return socket_fd;
+}
+
+static void sigchild_handler (int sig) {
+    sig = sig;
+
+    int pid = waitpid(ERROR, NULL, WNOHANG);
+    while (pid > 0) {
+        pid = waitpid(ERROR, NULL, WNOHANG);
+    };
 }
 
 /*
