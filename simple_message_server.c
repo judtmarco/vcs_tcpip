@@ -90,6 +90,7 @@ int main (const int argc, char* const argv[])
                     exit_on_error(0, "port is invalid");
                 }
                 // Create and setup a socket
+                printf("Port checked ...\n");
                 socket_fd = create_socket(optarg);
                 break;
             case 'h':
@@ -109,6 +110,7 @@ int main (const int argc, char* const argv[])
     socklen_t client_addr_size;
     struct sockaddr_storage client_addr;
     int new_fd = 0;
+    printf("Wait for incoming connections ...\n");
     while (1) {
         client_addr_size = sizeof(client_addr);
 
@@ -129,8 +131,31 @@ int main (const int argc, char* const argv[])
         // Child
         if (cpid == 0) {
             close (socket_fd);
-            // TODO: Duplicating client socket
-            // TODO: Redirect stdin and stdout of forked child daemon to connected socket
+
+            errno = 0;
+            int ret_dup = dup2 (new_fd, STDIN_FILENO);
+            if (ret_dup == ERROR) {
+                close (new_fd);
+                exit_on_error(errno, "dup2() failed");
+            }
+
+            errno = 0;
+            int ret_dup2 = dup2 (new_fd, STDOUT_FILENO);
+            if (ret_dup2 == ERROR) {
+                close (new_fd);
+                exit_on_error(errno, "dup2() failed");
+            }
+
+            errno = 0;
+            int ret_execlp = execlp("simple_message_server_logic", "simple_message_server_logic", NULL);
+            if (ret_execlp == ERROR)
+            {
+                close (new_fd);
+                exit_on_error(errno, "execlp() failed");
+            }
+
+            close (new_fd);
+            exit(EXIT_SUCCESS);
         }
         // Parent
         else {
@@ -225,6 +250,8 @@ static int create_socket (char *port) {
     if (ret_listen != 0) {
         exit_on_error(errno, "listen() failed");
     }
+
+    printf("Socket created ...\n");
 
     return socket_fd;
 }
