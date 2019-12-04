@@ -14,12 +14,17 @@ The project includes following files:
 
 simple_message_client.c
 =======================
-The client establishes a connection to the server. The message is sent to the server, then the write connection is closed and the client waits for a response, files received are stored in the file system.Connection to the server is closed.
+The function of the client is to establish a connection to the server. The message is sent to the server, then the write connection is closed and the client waits for a response, files received are stored in the file system. Connection to the server is closed.
 
 Usage: ./simple_message_client option
 options:
-
-Parameter:
+	-s, --server <server> (full qualified domain name or IP address of the server)
+	-p, --port <port> (well-known port of the server [0..65535])
+	-u, --user <name> (name of the posting user)
+	-i, --image <URL> (URL pointing to an image of the posting user)
+	-m, --message <message> (message to be added to the bulletin board)
+	-v, --verbose (verbose output)
+	-h, --help (Display usage of the program)
 
 simple_message_server.c
 =======================
@@ -27,9 +32,5 @@ The function of the server is to wait for incoming connections from a client on 
 
 Usage: ./simple_message_server option
 options:
-        -p, --port <port>
-        -h, --help
-
-Parameter:
-	-p, --port <port> (Port in range 1024-65545 on which to wait for incoming connections)
-	-h, --help (Display usage of the program)
+        -p, --port <port> (well-known port of the server [0..65535])
+        -h, --help (Display usage of the program)
