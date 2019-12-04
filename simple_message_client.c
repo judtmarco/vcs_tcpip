@@ -37,11 +37,13 @@
  * -------------------------------------------------------- GLOBAL VARIABLES -------------------------------------------
  */
 
-// This variable is just do get feedback from the cliet-application, when running on annuminas.
+// This variable is just to get feedback from the client-application, when running on annuminas.
 bool feedback = true;
 
 FILE *fp_for_write;
 FILE *fp_for_read;
+
+const char *prog_name = "";
 
 /*
  * -------------------------------------------------------- PROTOTYPES -------------------------------------------------
@@ -52,6 +54,7 @@ void print_Manuel (FILE *fp , const char *program_name , int exit_value);
 int connect_With_Server(const char *server_address, const char *server_port);
 int send_Message_To_Server(int socket_file_descriptor, const char *message, const char *user, const char *img_url);
 int receive_Message_From_Server(int socket_file_descriptor);
+static void exit_on_error (int error, char* message);
 
 
 /*
@@ -59,25 +62,80 @@ int receive_Message_From_Server(int socket_file_descriptor);
  */
 
 int main (int argc, const char *argv []) {
-
-
-
-
-
-
+    prog_name = argv[0];
+    return EXIT_SUCCESS;
 }
 
 /*
  * -------------------------------------------------------- FUNCTIONS --------------------------------------------------
  */
 
-int receive_Message_From_Server (int socket_file_descriptor){
-    
+void receive_Message_From_Server (int socket_file_descriptor){
 
+    fp_for_read = fdopen(socket_file_descriptor,"r");
+    if (fp_for_read == NULL) {
+        // Close and exit on error
+    }
 
+    // Search "status=" in response from server
+    char *lines = NULL;
+    size_t lineSize = 0;
+
+    // Read an entire line from fp_for_read
+    errno = 0;
+    int ret_getline = getline (&lines, &lineSize, fp_for_read);
+    if (ret_getline == -1) {
+        free(lines);
+        if (errno != 0) {
+            // Close and exit on error
+        }
+        else {
+            // EOF
+        }
+    }
+
+    // Read formatted input from a string
+    int ret_sscanf = sscanf (line, "status=%d", status);
+    if (ret_sscanf == 0 || ret_sscanf == EOF) {
+        free(lines);
+        // Close and exit on error
+    }
+
+    if (status != 0) {
+        // Close and exit on error with error code from status
+    }
+
+    // Search "file=" in response from server
+    *lines = NULL;
+    lineSize = 0;
+    char *fileName = NULL;
+
+    // Read an entire line from fp_for_read
+    errno = 0;
+    ret_getline = getline (&lines, &lineSize, fp_for_read);
+    if (ret_getline == -1) {
+        free(lines);
+        if (errno != 0) {
+            // Close and exit on error
+        }
+        else {
+            // EOF
+        }
+    }
+
+    fileName = malloc (sizeof(char) * strlen(lines));
+    if (fileName == NULL) {
+        free(lines);
+        // Close and exit on error
+    }
+
+    ret_sscanf = sscanf (lines, "file=%s", fileName);
+    if (ret_sscanf == 0 || ret_sscanf == EOF || (strlen(fileName) == 0)) {
+        free(lines);
+        free(fileName);
+        // Close and exit on error
+    }
 }
-
-
 
 
 int send_Message_To_Server(int socket_file_descriptor, const char *message, const char *user, const char *img_url){
@@ -159,7 +217,7 @@ int connect_With_Server(const char *server_address, const char *server_port) {
     int return_value;
     int socket_file_descriptor;
 
-    memset(&hints, 0, sizeof(hints));       /* Fill all the memory of hints with zeros */
+    memset(&hints, 0, sizeof(hints));          /* Fill all the memory of hints with zeros */
     hints.ai_family = AF_UNSPEC;               /* IPv4 & IPv6 are possible */
     hints.ai_socktype = SOCK_STREAM;           /* Define socket for TCP */
     hints.ai_protocol = 0;                     /* Define for the returned socket any possible protocol */
@@ -213,7 +271,7 @@ int connect_With_Server(const char *server_address, const char *server_port) {
     }
 
     if (feedback) {
-        printf("function: connect_With_Server | seccussful connected to Server\n");
+        printf("function: connect_With_Server | successful connected to Server\n");
     }
 
     return socket_file_descriptor;
@@ -247,4 +305,13 @@ void print_Manuel (FILE *fp , const char *program_name , int exit_value) {
     exit(exit_value);
 }
 
+static void exit_on_error (int error, char* message) {
 
+    if (error != 0) {
+        fprintf(stderr, "%s: %s: %s\n", prog_name, message, strerror(error));
+    }
+    else {
+        fprintf(stderr, "%s: %s\n", prog_name, message);
+    }
+    exit(EXIT_FAILURE);
+}
