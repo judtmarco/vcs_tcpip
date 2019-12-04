@@ -8,6 +8,8 @@
  * @git https://github.com/judtmarco/vcs_tcpip
  * @date 11/25/2019
  * @version 1.0
+ *
+ * TODO: Doxygen comments and comment the code
  */
 
 /*
@@ -32,10 +34,6 @@
 #define MAX_PORTNUMBER 65536
 #define MIN_PORTNUMBER 1023
 #define ERROR -1
-
-/*
- * --------------------------------------------------------------- typedefs --
- */
 
 /*
  * --------------------------------------------------------------- globals --
@@ -172,7 +170,6 @@ int main (const int argc, char* const argv[])
         else {
             close (new_fd);
         }
-
     }
     /* Never reach this */
     return EXIT_SUCCESS;
@@ -193,7 +190,7 @@ static void usage(void)
                "\t-p, --port <port>\n"
                "\t-h, --help\n" , prog_name) < 0)
     {
-        exit_on_error(errno, "printf() failed");
+        exit_on_error(0, "printf() failed");
     }
 }
 
@@ -223,7 +220,7 @@ static void exit_on_error (int error, char* message) {
 *
 *
 \param
-\return void
+\return
 */
 static int create_socket (char *port) {
     struct addrinfo hints;
@@ -273,6 +270,13 @@ static int create_socket (char *port) {
     return socket_fd;
 }
 
+/**
+* \brief
+*
+*
+\param
+\return void
+*/
 static void sigchild_handler (int sig) {
     sig = sig;
 

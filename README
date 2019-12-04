@@ -1,5 +1,35 @@
-Verteilte Systeme - TCP/IP Client-Server Programmierung
+Verteilte Systeme - TCP/IP client/server programming project
 
-Autoren:
+Authors:
 	Marco Judt (ic18b039@technikum-wien.at)
 	Andreas Hinterberger (ic18b008@technikum-wien.at)
+
+As part of the project, a bulletin board/billboard for messages of all kinds, will be realized. For the exercise, the Linux server annuminas.technikum-wien.at is used.
+
+The project includes following files:
+	simple_message_client.c
+	simple_message_server.c
+	Makefile
+	README
+
+simple_message_client.c
+=======================
+The client establishes a connection to the server. The message is sent to the server, then the write connection is closed and the client waits for a response, files received are stored in the file system.Connection to the server is closed.
+
+Usage: ./simple_message_client option
+options:
+
+Parameter:
+
+simple_message_server.c
+=======================
+The function of the server is to wait for incoming connections from a client on a given port. For each accepted connection, a child process is created the default server logic (simple_message_server_logic) is executed.
+
+Usage: ./simple_message_server option
+options:
+        -p, --port <port>
+        -h, --help
+
+Parameter:
+	-p, --port <port> (Port in range 1024-65545 on which to wait for incoming connections)
+	-h, --help (Display usage of the program)
