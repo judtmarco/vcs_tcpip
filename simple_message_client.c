@@ -20,6 +20,7 @@
 #include <memory.h>
 #include <unistd.h>
 //#include <zconf.h>
+#include <errno.h>
 
 /*
  * -------------------------------------------------------- HEADER------------------------------------------------------
@@ -31,7 +32,7 @@
  * -------------------------------------------------------- DEFINE -----------------------------------------------------
  */
 
-#define BUF_SIZE 256
+#define BUF_SIZE 512
 
 /*
  * -------------------------------------------------------- GLOBAL VARIABLES -------------------------------------------
@@ -53,7 +54,7 @@ void parse_Command(int argc, const char *argv[], const char **server, const char
 void print_Manuel (FILE *fp , const char *program_name , int exit_value);
 int connect_With_Server(const char *server_address, const char *server_port);
 int send_Message_To_Server(int socket_file_descriptor, const char *message, const char *user, const char *img_url);
-int receive_Message_From_Server(int socket_file_descriptor);
+void receive_Message_From_Server(int socket_file_descriptor);
 static void exit_on_error (int error, char* message);
 
 
@@ -95,7 +96,7 @@ void receive_Message_From_Server (int socket_file_descriptor){
     }
 
     // Read formatted input from a string
-    int ret_sscanf = sscanf (line, "status=%d", status);
+    int ret_sscanf = sscanf (lines, "status=%d", status);
     if (ret_sscanf == 0 || ret_sscanf == EOF) {
         free(lines);
         // Close and exit on error
@@ -135,6 +136,59 @@ void receive_Message_From_Server (int socket_file_descriptor){
         free(fileName);
         // Close and exit on error
     }
+
+    // Read the length from the given file
+
+    *lines = NULL;
+    lineSize = 0;
+    char *fileLenght = NULL;
+
+    errno = 0;
+    ret_getline = getline(&lines, &lineSize,fp_for_read);
+
+    if (ret_getline == -1) {
+        free(lines);
+        if (errno != 0) {
+            // Close and exit on error
+        }
+        else {
+            // EOF
+        }
+    }
+
+    fileLenght = malloc (sizeof(char) * strlen(lines));
+    if (fileLenght== NULL) {
+        free(lines);
+        // Close and exit on error
+    }
+
+    ret_sscanf = sscanf (lines, "len=%s", fileLenght);
+    if (ret_sscanf == 0 || ret_sscanf == EOF || (strlen(fileLenght) == 0)) {
+        free(lines);
+        free(fileLenght);
+        // Close and exit on error
+    }
+
+    long val = 0;
+    char *test;       // hier sollte der char anteil gespeichert werden
+
+    val = strtol(fileLenght, *test, 32);
+
+    if (strcmp(test, "len=") != 0){
+
+        free(lines);
+        free(fileLenght);
+        // Close and exit on error
+
+    }
+
+
+    //
+
+
+
+
+
 }
 
 
@@ -175,7 +229,7 @@ int send_Message_To_Server(int socket_file_descriptor, const char *message, cons
             printf("function: send_Message_To_Server | seccussful sending message without img-url to server\n");
         }
 
-     // Sending message with img-URL
+        // Sending message with img-URL
 
     } else {
 
