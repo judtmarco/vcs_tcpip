@@ -174,16 +174,41 @@ void receive_Message_From_Server (int socket_file_descriptor){
 
     val = strtol(fileLenght, *test, 32);
 
-    if (strcmp(test, "len=") != 0){
+    if (strcmp(test, "len=") != 0 || val == 0 ){
 
         free(lines);
         free(fileLenght);
         // Close and exit on error
-
     }
-
-
-    //
+    
+    /*
+     * Write status=..., file=..., len=..., into to file ???
+     */
+    
+    int rounds_in_while = ((int)val/BUF_SIZE) + 1; // calculate how much lines it needs to make in the while for reading the file
+    
+    FILE *write_in_outputfile = fopen(*fileName, "w");
+    
+    if (write_in_outputfile == NULL) {
+        //fprintf(stderr, "failure in copying file message");
+        fclose(write_in_outputfile);
+        // Close and exit on error
+    }
+    
+    
+    for (int i = 0; i < rounds_in_while; i++){
+        
+        if (write_in_outputfile == EOF && ((i<rounds_in_while-1))){
+            // Gemeinenen Testcase abfangen
+            fclose(write_in_outputfile);
+            fprintf(stderr, "reached EOF unaccpectad");
+            // Close and exit on error
+        }
+        
+        //fread(BUF_SIZE,)
+        
+        
+    }
 
 
 
