@@ -173,6 +173,7 @@ void receive_Message_From_Server (int socket_file_descriptor){
     char *test;       // hier sollte der char anteil gespeichert werden
 
     val = strtol(fileLenght, *test, 32);
+    int lenght_of_file = val +1;                                          // falls eine Komazahl raus kommt
 
     if (strcmp(test, "len=") != 0 || val == 0 ){
 
@@ -180,40 +181,64 @@ void receive_Message_From_Server (int socket_file_descriptor){
         free(fileLenght);
         // Close and exit on error
     }
-    
+
     /*
      * Write status=..., file=..., len=..., into to file ???
      */
-    
-    int rounds_in_while = ((int)val/BUF_SIZE) + 1; // calculate how much lines it needs to make in the while for reading the file
-    
-    FILE *write_in_outputfile = fopen(*fileName, "w");
-    
-    if (write_in_outputfile == NULL) {
+
+    // int rounds_in_while = ((int)val/BUF_SIZE) + 1; // calculate how much lines it needs to make in the while for reading the file
+
+    FILE *outputfile = fopen(*fileName, "w");
+
+    if (outputfile == NULL) {
         //fprintf(stderr, "failure in copying file message");
-        fclose(write_in_outputfile);
+        fclose(outputfile);
         // Close and exit on error
     }
-    
-    
-    for (int i = 0; i < rounds_in_while; i++){
+
+    int read_lenght = 0;
+    int max_read = 0;
+    int foo = 0;
+    char buffer [BUF_SIZE];
+
+
+    while (read_lenght < lenght_of_file){
+
+        if ((lenght_of_file - read_lenght) > BUF_SIZE) {
+
+            max_read = BUF_SIZE;
+
+        } else {
+
+            max_read = lenght_of_file - read_lenght;
+
+        }
+
+        foo = 0;
+        foo = fread(buffer, sizeof(char), max_read, fp_for_read);
         
-        if (write_in_outputfile == EOF && ((i<rounds_in_while-1))){
-            // Gemeinenen Testcase abfangen
-            fclose(write_in_outputfile);
+        if (foo < 10 && foo < max_read){
+
+            fclose(outputfile);
             fprintf(stderr, "reached EOF unaccpectad");
-            // Close and exit on error
+            break;
+            
         }
         
-        //fread(BUF_SIZE,)
+        read_lenght += foo;
         
-        
+        if ((int)fwrite(buffer, sizeof(char), foo, outputfile) != max_read){
+
+            fclose(outputfile);
+            fclose(fp_for_read);
+            fprintf(stderr, "error while writing into outputfile");
+            break;
+        }
     }
-
-
-
-
-
+    
+    free (fileLenght);
+    free (fileName);
+    
 }
 
 
