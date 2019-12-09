@@ -70,7 +70,14 @@ int main (const int argc, const char *argv[]) {
     const char *message = NULL;
     const char *img_url = NULL;
     int verbose;
+    int ret_send = 0;
     parse_Command(argc, argv, &server, &port, &user, &message, &img_url, &verbose);
+    int sfd = connect_With_Server(server, port);
+    ret_send = send_Message_To_Server(sfd, message, user, img_url);
+    if (ret_send == 0) {
+        printf("Message sent\n");
+    }
+    receive_Message_From_Server(sfd);
     return EXIT_SUCCESS;
 }
 
