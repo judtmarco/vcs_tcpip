@@ -50,20 +50,27 @@ const char *prog_name = "";
  * -------------------------------------------------------- PROTOTYPES -------------------------------------------------
  */
 
-void parse_Command(int argc, const char *argv[], const char **server, const char **port, const char **user, const char **message, const char **img_url, int *verbose);
+void parse_Command(const int argc, const char *argv[], const char **server, const char **port, const char **user, const char **message, const char **img_url, int *verbose);
 void print_Manuel (FILE *fp , const char *program_name , int exit_value);
 int connect_With_Server(const char *server_address, const char *server_port);
 int send_Message_To_Server(int socket_file_descriptor, const char *message, const char *user, const char *img_url);
 void receive_Message_From_Server(int socket_file_descriptor);
-static void exit_on_error (int error, char* message);
+//static void exit_on_error (int error, char* message);
 
 
 /*
  * -------------------------------------------------------- MAIN -------------------------------------------------------
  */
 
-int main (int argc, const char *argv []) {
+int main (const int argc, const char *argv[]) {
     prog_name = argv[0];
+    const char *server = NULL;
+    const char *port = NULL;
+    const char *user = NULL;
+    const char *message = NULL;
+    const char *img_url = NULL;
+    int verbose;
+    parse_Command(argc, argv, &server, &port, &user, &message, &img_url, &verbose);
     return EXIT_SUCCESS;
 }
 
@@ -96,7 +103,8 @@ void receive_Message_From_Server (int socket_file_descriptor){
     }
 
     // Read formatted input from a string
-    int ret_sscanf = sscanf (lines, "status=%d", status);
+    int status = 0;
+    int ret_sscanf = sscanf (lines, "status=%d", &status);
     if (ret_sscanf == 0 || ret_sscanf == EOF) {
         free(lines);
         // Close and exit on error
@@ -107,7 +115,7 @@ void receive_Message_From_Server (int socket_file_descriptor){
     }
 
     // Search "file=" in response from server
-    *lines = NULL;
+    lines = NULL;
     lineSize = 0;
     char *fileName = NULL;
 
@@ -139,7 +147,7 @@ void receive_Message_From_Server (int socket_file_descriptor){
 
     // Read the length from the given file
 
-    *lines = NULL;
+    lines = NULL;
     lineSize = 0;
     char *fileLenght = NULL;
 
@@ -172,7 +180,7 @@ void receive_Message_From_Server (int socket_file_descriptor){
     long val = 0;
     char *test;       // hier sollte der char anteil gespeichert werden
 
-    val = strtol(fileLenght, *test, 32);
+    val = strtol(fileLenght, &test, 32);
     int lenght_of_file = val +1;                                          // falls eine Komazahl raus kommt
 
     if (strcmp(test, "len=") != 0 || val == 0 ){
@@ -188,7 +196,7 @@ void receive_Message_From_Server (int socket_file_descriptor){
 
     // int rounds_in_while = ((int)val/BUF_SIZE) + 1; // calculate how much lines it needs to make in the while for reading the file
 
-    FILE *outputfile = fopen(*fileName, "w");
+    FILE *outputfile = fopen(fileName, "w");
 
     if (outputfile == NULL) {
         //fprintf(stderr, "failure in copying file message");
@@ -244,7 +252,7 @@ void receive_Message_From_Server (int socket_file_descriptor){
 
 int send_Message_To_Server(int socket_file_descriptor, const char *message, const char *user, const char *img_url){
 
-    size_t length_of_message;
+    //size_t length_of_message;
 
     fp_for_write = fdopen(socket_file_descriptor,"w");
 
@@ -265,13 +273,13 @@ int send_Message_To_Server(int socket_file_descriptor, const char *message, cons
         }
 
         // FLUSH !!
-
-        if ((length_of_message = strlen(fp_for_write)) == 0) {
+        /*Das geht nicht*/
+        /*if ((length_of_message = strlen(fp_for_write)) == 0) {
 
             fprintf(stderr, "failed calculation lenght of message \n");
             fclose(fp_for_write);
             return -1;
-        }
+        }*/
 
 
 
@@ -295,13 +303,13 @@ int send_Message_To_Server(int socket_file_descriptor, const char *message, cons
         }
 
         // FLUSH!!
-
-        if ((length_of_message = strlen(fp_for_write)) == 0) {
+        /*Das geht nicht*/
+        /*if ((length_of_message = strlen(fp_for_write)) == 0) {
 
             fprintf(stderr, "failed calculation lenght of message \n");
             fclose(fp_for_write);
             return -1;
-        }
+        }*/
 
 
         if (feedback) {
@@ -310,6 +318,7 @@ int send_Message_To_Server(int socket_file_descriptor, const char *message, cons
 
     }
 
+    return 0;
 
 }
 
@@ -383,7 +392,7 @@ int connect_With_Server(const char *server_address, const char *server_port) {
 }
 
 
-void parse_Command (int argc, const char *argv[], const char **server, const char **port, const char **user, const char **message, const char **img_url, int *verbose){
+void parse_Command (const int argc, const char *argv[], const char **server, const char **port, const char **user, const char **message, const char **img_url, int *verbose){
 
     smc_parsecommandline (argc, argv, (smc_usagefunc_t) &print_Manuel, server, port, user, message, img_url, verbose);
 
@@ -408,7 +417,7 @@ void print_Manuel (FILE *fp , const char *program_name , int exit_value) {
 
     exit(exit_value);
 }
-
+/*
 static void exit_on_error (int error, char* message) {
 
     if (error != 0) {
@@ -419,3 +428,4 @@ static void exit_on_error (int error, char* message) {
     }
     exit(EXIT_FAILURE);
 }
+*/
