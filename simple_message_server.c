@@ -8,8 +8,6 @@
  * @git https://github.com/judtmarco/vcs_tcpip
  * @date 11/25/2019
  * @version FINAL
- *
- * TODO: Comments ... Doxygen comments
  */
 
 /*
@@ -31,7 +29,7 @@
  * --------------------------------------------------------------- defines --
  */
 #define LISTEN_BACKLOG 10 /* Maximum length to which the queue of pending connections may grow */
-#define MIN_PORTNUMBER 1023 /* If under 1024 - bind() fails*/
+#define MIN_PORTNUMBER 1023 /* If under 1024 (well-known ports) - bind() fails */
 #define MAX_PORTNUMBER 65536
 #define ERROR -1
 
@@ -39,7 +37,7 @@
  * --------------------------------------------------------------- globals --
  */
 const char *prog_name = ""; /* To save the program name and display it in usage and error function */
-int socket_fd = 0; /* File desciptor for connection with client - global to access it in create and error function */
+int socket_fd = 0; /* File descriptor for connection with client - global to access it in create and error function */
 
 /*
  * ------------------------------------------------------------- prototypes --
@@ -55,12 +53,12 @@ static void sigchild_handler (int sig);
 /**
 * \brief Main function of simple_message.server.c
 *
- * This is the start of the code. Commandline arguments are checked and parsed with getopt_long. Signal handler for child process
- * is initialized and loop for incoming connections is done.
+* This is the start of the code. Commandline arguments are checked and parsed with getopt_long. Signal handler for child process
+* is initialized and loop for incoming connections is done.
 *
 \param argc Contains number of arguments
 \param argv An Array of char const pointer with the command line arguments
-\return 0 if successfully completed
+\return EXIT_SUCCESS If successfully completed
 */
 int main (const int argc, char* const argv[])
 {
@@ -208,7 +206,7 @@ int main (const int argc, char* const argv[])
 /**
 * \brief Message for usage of simple_message_server
 *
-* Displays an message on how to use the program.
+* Displays a message on how to use the program.
 *
 \param void
 \return void
@@ -227,8 +225,8 @@ static void usage(void)
 /**
 * \brief Error function for exiting the code
 *
- * Checks if the socket file descriptor is already created and closes it if so. Checks if there is an error code and prints
- * error message with or without on stderr. Exits the program.
+* Checks if the socket file descriptor is already created and closes it if so. Checks if there is an error code and prints
+* error message with or without on stderr. Exits the program.
 *
 \param error Error code to display in the error message
 \param message Message what went wrong
@@ -251,18 +249,21 @@ static void exit_on_error (int error, char* message) {
 /**
 * \brief Create socket file descriptor for connections
 *
- *
+* In this function an endpoint for communication is created and a file descriptor that refers to that endpoint is set up.
+* First, addrinfo structs are loaded up with getaddrinfo. Then the endpoint is created and bound to the specified server port.
+* Lastly, the socket is configured to be a server listening socket.
 *
-\param port
-\return The created socket file descriptor
+\param port The specified server port given with command line arguments
+\return socket_fd The created socket file descriptor
 */
 static int create_socket (char *port) {
     struct addrinfo hints;
     struct addrinfo *result;
-    int ret_getaddrinfo, ret_bind, ret_listen;
+    int ret_getaddrinfo, ret_bind, ret_listen, ret_sockopt;
 
+    /* Load up address structs with getaddrinfo */
     memset(&hints, 0, sizeof(struct addrinfo));
-    hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
+    hints.ai_family = AF_INET;    /* Allow only IPv4 */
     hints.ai_socktype = SOCK_STREAM; /* Bytestream socket */
     hints.ai_flags = AI_PASSIVE;    /* For wildcard IP address */
     hints.ai_protocol = 0;          /* Any protocol */
@@ -276,25 +277,30 @@ static int create_socket (char *port) {
         exit_on_error(errno, "getaddrinfo() failed");
     }
 
+    /* Create a socket */
     errno = 0;
     socket_fd = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
     if (socket_fd == ERROR) {
         exit_on_error(errno, "socket() failed");
     }
 
+    /* // Bind socket to the specified port */
     errno = 0;
     ret_bind = bind(socket_fd, result->ai_addr, result->ai_addrlen);
     if (ret_bind != 0) {
         exit_on_error(errno, "bind() failed");
     }
 
+    /* Set the socket options - SOL_SOCKET needs to be set to set options at the socket level;
+     * SO_REUSEADDR allows reuse of local addresses*/
     errno = 0;
-    int yes = 1;
-    int ret_sockopt = setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int));
+    int optval = 1;
+    ret_sockopt = setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
     if (ret_sockopt == ERROR) {
         exit_on_error(errno, "setsockopt() failed");
     }
 
+    /* Set socket_fd up to be a server (listening) socket */
     errno = 0;
     ret_listen = listen(socket_fd, LISTEN_BACKLOG);
     if (ret_listen != 0) {
@@ -306,15 +312,16 @@ static int create_socket (char *port) {
 
 /**
 * \brief Function to reap all dead child processes
- *
- *
 *
-\param sig
+* This function uses waitpid to reap all dead child processes. WNOHANG is used to return immediately if no child has exited.
+*
+\param sig Signal handler function needs this parameter
 \return void
 */
 static void sigchild_handler (int sig) {
-    sig = sig;
+    /* Wait for child process to change state */
     while (waitpid(ERROR, NULL, WNOHANG) > 0);
+    sig = sig;
 }
 
 /*
