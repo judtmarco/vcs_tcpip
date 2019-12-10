@@ -7,9 +7,9 @@
  *
  * @git https://github.com/judtmarco/vcs_tcpip
  * @date 11/25/2019
- * @version 1.0
+ * @version FINAL
  *
- * TODO: Doxygen comments and comment the code
+ * TODO: Comments ... Doxygen comments
  */
 
 /*
@@ -30,16 +30,16 @@
 /*
  * --------------------------------------------------------------- defines --
  */
-#define LISTEN_BACKLOG 30
+#define LISTEN_BACKLOG 10 /* Maximum length to which the queue of pending connections may grow */
+#define MIN_PORTNUMBER 1023 /* If under 1024 - bind() fails*/
 #define MAX_PORTNUMBER 65536
-#define MIN_PORTNUMBER 1023
 #define ERROR -1
 
 /*
  * --------------------------------------------------------------- globals --
  */
-const char *prog_name = "";
-int socket_fd = 0;
+const char *prog_name = ""; /* To save the program name and display it in usage and error function */
+int socket_fd = 0; /* File desciptor for connection with client - global to access it in create and error function */
 
 /*
  * ------------------------------------------------------------- prototypes --
@@ -53,11 +53,14 @@ static void sigchild_handler (int sig);
  * ------------------------------------------------------------- functions --
  */
 /**
-* \brief
+* \brief Main function of simple_message.server.c
 *
+ * This is the start of the code. Commandline arguments are checked and parsed with getopt_long. Signal handler for child process
+ * is initialized and loop for incoming connections is done.
 *
-\param
-\return
+\param argc Contains number of arguments
+\param argv An Array of char const pointer with the command line arguments
+\return 0 if successfully completed
 */
 int main (const int argc, char* const argv[])
 {
@@ -69,24 +72,25 @@ int main (const int argc, char* const argv[])
         return EXIT_FAILURE;
     }
 
-    // Parse command line arguments with getopt
+    // Parse command line arguments with getopt_long
     int opt = 0;
     long int port = 0;
     char *strtol_ptr = NULL;
     static struct option long_options[] = {
-            {"port",  required_argument, 0,  'p' },
-            {"help",  no_argument,       0,  'h' },
-            {NULL,  0, 0,  0 }
+            {"port",    required_argument,  0,  'p' },
+            {"help",    no_argument,        0,  'h' },
+            {0,         0,                  0,   0 }
     };
 
     while ((opt = getopt_long(argc, argv, "p:h", long_options, NULL)) != ERROR) {
         switch (opt) {
             case 'p':
                 errno = 0;
-                port = strtol(optarg, &strtol_ptr, 10);
+                port = strtol(optarg, &strtol_ptr, 10); /* Convert given port to long int */
                 if (errno != 0) {
                     exit_on_error(errno, "strtol() failed");
                 }
+                /* Check if Port is in range and check the next value after numerical value (has to be \0) */
                 if(port <= MIN_PORTNUMBER || port >= MAX_PORTNUMBER || *strtol_ptr != '\0') {
                     exit_on_error(0, "port is invalid");
                 }
@@ -106,69 +110,95 @@ int main (const int argc, char* const argv[])
 
     // Initializing signal handler for child process
     struct sigaction sa;
-    sa.sa_handler = sigchild_handler; // reap all dead processes
-    sigemptyset(&sa.sa_mask);
+    memset (&sa, 0, sizeof(sa)); /* Set sa to 0 to not be undefined */
+    sa.sa_handler = sigchild_handler; /* Configure signal handler with sigchild_handler to reap all dead processes */
+
+    errno = 0;
+    int ret_sigemptyset = sigemptyset(&sa.sa_mask); /* Initializes the signal set to empty */
+    if (ret_sigemptyset == ERROR) {
+        exit_on_error(errno, "sigemptyset() failed");
+    }
+
+    /* sa_flags is a set of flags which modify the behavior of the signal
+     * SA_RESTART = Provide behavior compatible with BSD signal semantics by making certain system calls restartable across signals */
     sa.sa_flags = SA_RESTART;
 
     errno = 0;
-    int ret_sigaction = sigaction(SIGCHLD, &sa, NULL);
+    int ret_sigaction = sigaction(SIGCHLD, &sa, NULL); /* Change the action taken by process on receipt of a specific signal */
     if (ret_sigaction == ERROR) {
         exit_on_error(errno, "sigaction() failed");
     }
 
     // Loop for incoming connections from client
     socklen_t client_addr_size;
-    struct sockaddr_storage client_addr;
+    struct sockaddr_storage client_addr; /* Store socket address information */
     int new_fd = 0;
     while (1) {
         client_addr_size = sizeof(client_addr);
 
         errno = 0;
+        /* Extract the first connection request on the queue of pending connections for the listening socket
+         * and create new connected socket*/
         new_fd = accept(socket_fd, (struct sockaddr *) &client_addr, &client_addr_size);
         if (new_fd == ERROR) {
-            close (new_fd);
+            close (new_fd); /* Additionally close new connected socket */
             exit_on_error(errno, "accept() failed");
         }
 
         errno = 0;
+        /* Create new process by duplicating the calling process */
         pid_t cpid = fork();
         if (cpid == ERROR) {
-            close (new_fd);
+            close (new_fd); /* Additionally close new connected socket */
             exit_on_error(errno, "fork() failed");
         }
 
-        // Child
+        // This is the child process
         if (cpid == 0) {
-            close (socket_fd);
+            errno = 0;
+            int ret_close = close (socket_fd); /* Child has to close listening socket */
+            if (ret_close == ERROR) {
+                exit_on_error(errno, "close() listening socket failed");
+            }
 
+            // Create copy of new connected socket file descriptor using STDIN and STDOUT
             errno = 0;
             int ret_dup = dup2 (new_fd, STDIN_FILENO);
             if (ret_dup == ERROR) {
-                close (new_fd);
+                close (new_fd); /* Additionally close new connected socket */
                 exit_on_error(errno, "dup2() failed");
             }
 
             errno = 0;
             int ret_dup2 = dup2 (new_fd, STDOUT_FILENO);
             if (ret_dup2 == ERROR) {
-                close (new_fd);
+                close (new_fd); /* Additionally close new connected socket */
                 exit_on_error(errno, "dup2() failed");
             }
 
+            // Execute the business logic
             errno = 0;
             int ret_execlp = execlp("simple_message_server_logic", "simple_message_server_logic", NULL);
             if (ret_execlp == ERROR)
             {
-                close (new_fd);
+                close (new_fd); /* Additionally close new connected socket */
                 exit_on_error(errno, "execlp() failed");
             }
 
-            close (new_fd);
+            /* Close connected socket when done */
+            ret_close = close (new_fd);
+            if (ret_close == ERROR) {
+                exit_on_error(errno, "close() connected socket failed");
+            }
             exit(EXIT_SUCCESS);
         }
-        // Parent
+        // This is the parent process
         else {
-            close (new_fd);
+            errno = 0;
+            int ret_close = close (new_fd); /* Parent has to close connected socket */
+            if (ret_close == ERROR) {
+                exit_on_error(errno, "close() connected socket failed");
+            }
         }
     }
     /* Never reach this */
@@ -176,9 +206,9 @@ int main (const int argc, char* const argv[])
 }
 
 /**
-* \brief Error message for usage of simple_message_server
+* \brief Message for usage of simple_message_server
 *
-* Prints an message on how to use the program.
+* Displays an message on how to use the program.
 *
 \param void
 \return void
@@ -195,10 +225,13 @@ static void usage(void)
 }
 
 /**
-* \brief
+* \brief Error function for exiting the code
 *
+ * Checks if the socket file descriptor is already created and closes it if so. Checks if there is an error code and prints
+ * error message with or without on stderr. Exits the program.
 *
-\param
+\param error Error code to display in the error message
+\param message Message what went wrong
 \return void
 */
 static void exit_on_error (int error, char* message) {
@@ -216,11 +249,12 @@ static void exit_on_error (int error, char* message) {
 }
 
 /**
-* \brief
+* \brief Create socket file descriptor for connections
 *
+ *
 *
-\param
-\return
+\param port
+\return The created socket file descriptor
 */
 static int create_socket (char *port) {
     struct addrinfo hints;
@@ -271,19 +305,16 @@ static int create_socket (char *port) {
 }
 
 /**
-* \brief
+* \brief Function to reap all dead child processes
+ *
+ *
 *
-*
-\param
+\param sig
 \return void
 */
 static void sigchild_handler (int sig) {
     sig = sig;
-
-    int pid = waitpid(ERROR, NULL, WNOHANG);
-    while (pid > 0) {
-        pid = waitpid(ERROR, NULL, WNOHANG);
-    };
+    while (waitpid(ERROR, NULL, WNOHANG) > 0);
 }
 
 /*
