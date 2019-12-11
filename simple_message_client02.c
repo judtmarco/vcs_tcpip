@@ -54,7 +54,7 @@ void print_Manuel (FILE *fp , const char *program_name , int exit_value);
 int connect_With_Server(const char *server_address, const char *server_port);
 int send_Message_To_Server(int socket_file_descriptor, const char *message, const char *user, const char *img_url);
 void receive_Message_From_Server(int socket_file_descriptor);
-static void exit_on_error (int error, char* message);
+//static void exit_on_error (int error, char* message);
 size_t read_File (FILE *fp,char *filename, size_t lenght);
 
 
@@ -62,7 +62,22 @@ size_t read_File (FILE *fp,char *filename, size_t lenght);
  * -------------------------------------------------------- MAIN -------------------------------------------------------
  */
 
+/**
+* \brief
+*
+*
+\param
+\param
+\return
+*/
 int main (int argc, const char *argv []) {
+
+    prog_name = argv[0];
+
+    if (argc < 2) {
+        fprintf(stderr, "Not enough arguments\n");
+        // Exit on error
+    }
 
     const char *server = NULL;
     const char *port = NULL;
@@ -70,54 +85,46 @@ int main (int argc, const char *argv []) {
     const char *message = NULL;
     const char *img_url = NULL;
 
-    int socket_w = 0;
-    int socket_r = 0;
-
-
-
     if (feedback){
         fprintf(stdout,"parsing the command\n");
     }
-
     parse_Command(argc,argv,&server, &port, &user, &message, &img_url, (int*)&verbose);
 
-    if (argc < 2) {
-        fprintf(stderr, "Not enough arguments\n");
-    }
+    int socket_w = 0;
+    int socket_r = 0;
 
     if (feedback){
         fprintf(stdout,"connecting with server\n");
     }
-
     socket_w = connect_With_Server(server, port);
 
     socket_r = dup(socket_w);
-
 
     if (feedback){
         fprintf(stdout,"Sending message to server\n");
     }
 
-    send_Message_To_Server(socket_w, message, user, img_url);
+    if (send_Message_To_Server(socket_w, message, user, img_url) != 0) {
+        exit (-1);
+        // Exit on error function
+    }
 
     if (feedback){
-        fprintf(stdout,"Recieving message from server\n");
+        fprintf(stdout,"Receiving message from server\n");
     }
 
     receive_Message_From_Server(socket_r);
 
     if (feedback){
-        fprintf(stdout,"End programm\n");
+        fprintf(stdout,"End program\n");
     }
 
     /*
     shutdown(fp_for_read, SHUT_RD);
     shutdown(fp_for_write, SHUT_WR);
-
     close(fp_for_write);
-    close(fp_for_read);
+    close(fp_for_read); */
 
-*/
     return EXIT_SUCCESS;
 }
 
@@ -125,6 +132,14 @@ int main (int argc, const char *argv []) {
  * -------------------------------------------------------- FUNCTIONS --------------------------------------------------
  */
 
+/**
+* \brief
+*
+*
+\param
+\param
+\return
+*/
 void receive_Message_From_Server (int socket_file_descriptor) {
 
     char *filename;
@@ -133,30 +148,30 @@ void receive_Message_From_Server (int socket_file_descriptor) {
     char *cutter;
     size_t lenght;
     size_t buffer_size = BUF_SIZE;
-    size_t rt_value;
+    int rt_value;
 
     //buffer (char*) malloc(BUF_SIZE);
-
-    FILE *fp_for_read = fdopen(socket_file_descriptor, "r");
 
     if (feedback){
         fprintf(stdout,"function receive_Message_From_Server | trying opening reading descriptor\n");
     }
 
-    if (fp_for_read == NULL){
-
+    FILE *fp_for_read = fdopen(socket_file_descriptor, "r");
+    if (fp_for_read == NULL) {
         fprintf(stderr, "Can not open file descriptor for reading");
-        // error
+        exit (-1);
+        // Exit on error function
     }
 
     if (feedback){
         fprintf(stdout,"function receive_Message_From_Server | opening reading descriptor successful\n");
     }
 
-
     if (feedback){
         fprintf(stdout,"function receive_Message_From_Server | trying reading status\n");
     }
+
+
 
     if (strcmp(buffer, "status=0\n") != 0){
 
@@ -167,14 +182,12 @@ void receive_Message_From_Server (int socket_file_descriptor) {
     fprintf(stdout, "BUFFER:'%s'\n",buffer);
 
 
-    while ((rt_value = getline(&b, &buffer_size, fp_for_read)) != 1) {
+    while ((rt_value = getline(&b, &buffer_size, fp_for_read)) == -1) {
 
         if (ferror(fp_for_read)){
             fprintf(stderr, "Reached foep");
             // Error handler
-
         }
-
 
         if (feedback){
             fprintf(stdout,"function receive_Message_From_Server |trying reading file=\n");
@@ -261,7 +274,14 @@ void receive_Message_From_Server (int socket_file_descriptor) {
     }
 }
 
-
+/**
+* \brief
+*
+*
+\param
+\param
+\return
+*/
 size_t read_File (FILE *fp ,char *filename, size_t lenght){
 
     bool error = false;
@@ -274,7 +294,6 @@ size_t read_File (FILE *fp ,char *filename, size_t lenght){
     if (feedback){
         fprintf(stdout,"function read_File | trying opening filedecriptor for outputfile\n");
     }
-
 
     FILE *output_file = fopen(filename,"w");
 
@@ -332,33 +351,44 @@ size_t read_File (FILE *fp ,char *filename, size_t lenght){
     }
 }
 
+/**
+* \brief
+*
+*
+\param
+\param
+\return
+*/
 int send_Message_To_Server(int socket_file_descriptor, const char *message, const char *user, const char *img_url){
 
-    size_t length_of_message;
-
+    errno = 0;
     FILE *fp_for_write = fdopen(socket_file_descriptor,"w");
-
+    if (fp_for_write == NULL) {
+        exit (-1);
+        // Exit on error function with errno
+    }
 
     // Sending message without img-URL
-
     if (img_url == NULL){
 
         if (feedback) {
             fprintf(stdout,"function: send_Message_To_Server | trying: sending message without img-url to server\n");
         }
 
+        // Hier gehört noch ein \n am ende vom string geschickt oder?
         if (fprintf(fp_for_write, "user=%s\n%s", user, message) < 0) {
 
             fprintf(stderr, "failed to write into file\n");
             fclose(fp_for_write);
             return -1;
+            // Exit on error function
         }
 
         if (feedback) {
             fprintf(stdout, "function: send_Message_To_Server | successful sending message without img-url to server | trying fflush\n");
         }
 
-        if (fflush(fp_for_write )!= 0){
+        if (fflush(fp_for_write ) == EOF){
 
             fprintf(stderr, "failed to flush descriptor\n");
             fclose(fp_for_write);
@@ -374,6 +404,7 @@ int send_Message_To_Server(int socket_file_descriptor, const char *message, cons
             fprintf(stderr, "failed to shutdown descriptor\n");
             fclose(fp_for_write);
             return -1;
+            // Exit on error function
         }
 
         if (feedback) {
@@ -381,47 +412,37 @@ int send_Message_To_Server(int socket_file_descriptor, const char *message, cons
         }
 
         fclose(fp_for_write);
-
-        /*
-        if ((length_of_message = strlen(fp_for_write)) == 0) {
-
-            fprintf(stderr, "failed calculation lenght of message \n");
-            fclose(fp_for_write);
-            return -1;
-        }
-
-         */
-
 
         if (feedback) {
             fprintf(stdout,"function: send_Message_To_Server | successful sending message without img-url to server\n");
         }
 
         // Sending message with img-URL
-
     } else {
 
         if (feedback) {
             fprintf(stdout,"function: send_Message_To_Server | trying: sending message with img-url to server\n");
         }
 
-
+        // Hier gehört noch ein \n am ende vom string geschickt oder?
         if (fprintf(fp_for_write, "user=%s\nimg=%s\n%s", user, img_url, message) < 0) {
 
             fprintf(stderr, "failed to write into file\n");
             fclose(fp_for_write);
             return -1;
+            // Exit on error function
         }
 
         if (feedback) {
             fprintf(stdout,"function: send_Message_To_Server | successful sending message with img-url to server | trying fflush\n");
         }
 
-        if (fflush(fp_for_write) != 0){
+        if (fflush(fp_for_write) == EOF){
 
             fprintf(stderr, "failed to flush descriptor\n");
             fclose(fp_for_write);
             return -1;
+            // Exit on error function
         }
 
         if (feedback) {
@@ -433,6 +454,7 @@ int send_Message_To_Server(int socket_file_descriptor, const char *message, cons
             fprintf(stderr, "failed to shutdown descriptor\n");
             fclose(fp_for_write);
             return -1;
+            // Exit on error function
         }
 
         if (feedback) {
@@ -441,39 +463,34 @@ int send_Message_To_Server(int socket_file_descriptor, const char *message, cons
 
         fclose(fp_for_write);
 
-        // FLUSH!!
-
-        /*
-        if ((length_of_message = strlen(fp_for_write)) == 0) {
-
-            fprintf(stderr, "failed calculation lenght of message \n");
-            fclose(fp_for_write);
-            return -1;
-        }
-
-         */
-
         if (feedback) {
             fprintf(stdout,"function: send_Message_To_Server | seccussful sending message with img-url to server\n");
         }
-
     }
 
-
+    return 0;
 }
 
+/**
+* \brief
+*
+*
+\param
+\param
+\return
+*/
 int connect_With_Server(const char *server_address, const char *server_port) {
 
     struct addrinfo hints;
-    struct addrinfo *serverinfo;
-    struct addrinfo *rp;
-    int return_value;
-    int socket_file_descriptor;
+    struct addrinfo *serverinfo, *rp;
+    int ret_getaddrinfo, socket_file_descriptor;
 
     memset(&hints, 0, sizeof(hints));          /* Fill all the memory of hints with zeros */
     hints.ai_family = AF_UNSPEC;               /* IPv4 & IPv6 are possible */
     hints.ai_socktype = SOCK_STREAM;           /* Define socket for TCP */
     hints.ai_protocol = 0;                     /* Define for the returned socket any possible protocol */
+
+    // Hier vl AI_ADDRCONFIG bei ai_flags???
     hints.ai_flags = AF_UNSPEC;                /* Takes my IP Address */
 
     if (feedback) {
@@ -485,9 +502,11 @@ int connect_With_Server(const char *server_address, const char *server_port) {
      * It writes the result as a pointer into the struct serverinfo.
      */
 
-    if ((return_value = getaddrinfo(server_address, server_port, &hints, &serverinfo))!=0) {
-        fprintf(stderr, "Failure in getaddrinfo: %s\n", gai_strerror(return_value));
+    ret_getaddrinfo = getaddrinfo(server_address, server_port, &hints, &serverinfo);
+    if (ret_getaddrinfo != 0) {
+        fprintf(stderr, "Failure in getaddrinfo: %s\n", gai_strerror(ret_getaddrinfo));
         return -1;
+        // Exit on error function
     }
 
     if (feedback) {
@@ -501,8 +520,13 @@ int connect_With_Server(const char *server_address, const char *server_port) {
 
     for (rp = serverinfo; rp != NULL; rp = rp->ai_next){
 
-        if ((socket_file_descriptor = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol)) == -1) {
+        /*if ((socket_file_descriptor = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol)) == -1) {
+            perror("client: socket");
+            continue;
+        }*/
 
+        socket_file_descriptor = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+        if (socket_file_descriptor == -1 ) {
             perror("client: socket");
             continue;
         }
@@ -511,16 +535,21 @@ int connect_With_Server(const char *server_address, const char *server_port) {
 
             close(socket_file_descriptor);
             perror("client: connected");
-            continue;
+            //continue;
+            //Hier das break oder???
+            break;
+
         }
 
-        break;
+        //break;
     }
 
-    if (rp == NULL){
+    freeaddrinfo(serverinfo);
 
+    if (rp == NULL){
         fprintf(stderr, "client failed to connect to server\n");
         return -1;
+        // Exit on error function
     }
 
     if (feedback) {
@@ -528,10 +557,16 @@ int connect_With_Server(const char *server_address, const char *server_port) {
     }
 
     return socket_file_descriptor;
-
 }
 
-
+/**
+* \brief
+*
+*
+\param
+\param
+\return
+*/
 void parse_Command (int argc, const char *argv[], const char **server, const char **port, const char **user, const char **message, const char **img_url, int *verbose){
 
     smc_parsecommandline (argc, argv, (smc_usagefunc_t) &print_Manuel, server, port, user, message, img_url, verbose);
@@ -542,7 +577,14 @@ void parse_Command (int argc, const char *argv[], const char **server, const cha
     }
 }
 
-
+/**
+* \brief
+*
+*
+\param
+\param
+\return
+*/
 void print_Manuel (FILE *fp , const char *program_name , int exit_value) {
 
     fprintf(fp, "usage: %s optoins\n", program_name);
@@ -557,7 +599,15 @@ void print_Manuel (FILE *fp , const char *program_name , int exit_value) {
 
     exit(exit_value);
 }
-
+/**
+* \brief
+*
+*
+\param
+\param
+\return
+*/
+/*
 static void exit_on_error (int error, char* message) {
 
     if (error != 0) {
@@ -568,3 +618,4 @@ static void exit_on_error (int error, char* message) {
     }
     exit(EXIT_FAILURE);
 }
+*/

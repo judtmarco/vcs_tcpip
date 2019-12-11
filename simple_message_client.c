@@ -4,7 +4,6 @@
  *
  *  @author Hinterberger Andreas <ic18b008@technikum-wien.at>
  *  @author Judt Marco <ic18b0xx@technikum-wien.at>
- *
  */
 
 /*
