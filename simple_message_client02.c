@@ -535,13 +535,9 @@ int connect_With_Server(const char *server_address, const char *server_port) {
 
             close(socket_file_descriptor);
             perror("client: connected");
-            //continue;
-            //Hier das break oder???
-            break;
-
+            continue;
         }
-
-        //break;
+        break;
     }
 
     freeaddrinfo(serverinfo);
