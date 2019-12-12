@@ -205,6 +205,7 @@ int receive_Message_From_Server (int socket_file_descriptor) {
         fprintf(stdout,"function receive_Message_From_Server | successfully reading status code from stream with status code=%d\n", status);
     }
 
+<<<<<<< HEAD
     int ret_getline = 0;
         // Read "file=" from server response
         buffer = NULL;
@@ -658,7 +659,6 @@ void print_Manuel (FILE *fp , const char *program_name , int exit_value) {
 */
 /*
 static void exit_on_error (int error, char* message) {
-
     if (error != 0) {
         fprintf(stderr, "%s: %s: %s\n", prog_name, message, strerror(error));
     }
