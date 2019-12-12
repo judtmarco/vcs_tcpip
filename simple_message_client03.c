@@ -7,7 +7,9 @@
  *
  *  @TODO Fehlerbehandlung!!! Fehlt noch komplett. Close, free, etc.
  *  @TODO Testcases anschauen
+ *  @TODO Doxygen Comments, Comments
  */
+
 
 /*
  * -------------------------------------------------------- INCLUDE ---------------------------------------------------
@@ -203,110 +205,125 @@ int receive_Message_From_Server (int socket_file_descriptor) {
         fprintf(stdout,"function receive_Message_From_Server | successfully reading status code from stream with status code=%d\n", status);
     }
 
-    // Read "file=" from server response
-    buffer = NULL;
-    length = 0;
-    char *fileName = NULL;
+    int ret_getline = 0;
+        // Read "file=" from server response
+        buffer = NULL;
+        length = 0;
+        char *fileName = NULL;
 
-    if (feedback){
-        fprintf(stdout,"function receive_Message_From_Server | trying reading a line from stream with getline\n");
-    }
+        while ((ret_getline = getline(&buffer, &length, fp_for_read)) != -1) {
 
-    errno = 0;
-    if (getline(&buffer, &length, fp_for_read) == -1) {
-        exit (-1);
-        // Exit on error function
-        // Check if errno != 0 or EOF
-    }
+            if (feedback) {
+                fprintf(stdout,
+                        "function receive_Message_From_Server | trying reading a line from stream with getline\n");
+            }
+/*
+        errno = 0;
+        if (getline(&buffer, &length, fp_for_read) == -1) {
+            exit(-1);
+            // Exit on error function
+            // Check if errno != 0 or EOF
+        }*/
 
-    if (feedback){
-        fprintf(stdout,"function receive_Message_From_Server | successfully reading a line from stream with getline\n");
-    }
+            if (feedback) {
+                fprintf(stdout,
+                        "function receive_Message_From_Server | successfully reading a line from stream with getline\n");
+            }
 
-    if (feedback){
-        fprintf(stdout,"function receive_Message_From_Server | trying reading filename from stream\n");
-    }
+            if (feedback) {
+                fprintf(stdout, "function receive_Message_From_Server | trying reading filename from stream\n");
+            }
 
-    fileName = malloc(sizeof(char) * strlen(buffer));
-    if (fileName == NULL) {
-        exit(-1);
-        // Exit on error function
-    }
-    fileName[0] = '\0';
+            printf("geht malloc eig\n");
+            fileName = malloc(sizeof(char) * strlen(buffer));
+            printf("na malloc geht ned\n");
+            if (fileName == NULL) {
+                exit(-1);
+                // Exit on error function
+            }
+            fileName[0] = '\0';
 
-    ret_sscanf = sscanf(buffer, "file=%s", fileName);
-    if (ret_sscanf == 0 || ret_sscanf == EOF) {
-        exit (-1);
-        // Exit on error function
-    }
-    free(buffer);
+            ret_sscanf = sscanf(buffer, "file=%s", fileName);
+            if (ret_sscanf == 0 || ret_sscanf == EOF) {
+                exit(-1);
+                // Exit on error function
+            }
+            free(buffer);
 
-    if (strlen(fileName) == 0) {
-        exit (-1);
-        // Exit on error function
-    }
+            if (strlen(fileName) == 0) {
+                exit(-1);
+                // Exit on error function
+            }
 
-    if (feedback){
-        fprintf(stdout,"function receive_Message_From_Server | successfully reading filename from stream with filename=%s\n", fileName);
-    }
+            if (feedback) {
+                fprintf(stdout,
+                        "function receive_Message_From_Server | successfully reading filename from stream with filename=%s\n",
+                        fileName);
+            }
 
-    // Read "len=" from server response
-    buffer = NULL;
-    length = 0;
-    unsigned long fileLength = 0;
+            // Read "len=" from server response
+            buffer = NULL;
+            length = 0;
+            unsigned long fileLength = 0;
 
-    if (feedback){
-        fprintf(stdout,"function receive_Message_From_Server | trying reading a line from stream with getline\n");
-    }
+            if (feedback) {
+                fprintf(stdout,
+                        "function receive_Message_From_Server | trying reading a line from stream with getline\n");
+            }
 
-    errno = 0;
-    if (getline(&buffer, &length, fp_for_read) == -1) {
-        exit (-1);
-        // Exit on error function
-        // Check if errno != 0 or EOF
-    }
+            errno = 0;
+            if (getline(&buffer, &length, fp_for_read) == -1) {
+                exit(-1);
+                // Exit on error function
+                // Check if errno != 0 or EOF
+            }
 
-    if (feedback){
-        fprintf(stdout,"function receive_Message_From_Server | successfully reading a line from stream with getline\n");
-    }
+            if (feedback) {
+                fprintf(stdout,
+                        "function receive_Message_From_Server | successfully reading a line from stream with getline\n");
+            }
 
-    if (feedback){
-        fprintf(stdout,"function receive_Message_From_Server | trying reading filelength from stream\n");
-    }
+            if (feedback) {
+                fprintf(stdout, "function receive_Message_From_Server | trying reading filelength from stream\n");
+            }
 
-    ret_sscanf = sscanf(buffer, "len=%lu", &fileLength);
-    if (ret_sscanf == 0 || ret_sscanf == EOF) {
-        exit (-1);
-        // Exit on error function
-    }
-    free(buffer);
+            ret_sscanf = sscanf(buffer, "len=%lu", &fileLength);
+            if (ret_sscanf == 0 || ret_sscanf == EOF) {
+                exit(-1);
+                // Exit on error function
+            }
+            free(buffer);
 
-    if (feedback){
-        fprintf(stdout,"function receive_Message_From_Server | successfully reading filelength from stream with len=%ld\n", fileLength);
-    }
+            if (feedback) {
+                fprintf(stdout,
+                        "function receive_Message_From_Server | successfully reading filelength from stream with len=%ld\n",
+                        fileLength);
+            }
 
-    // Open file and write in it
-    if (feedback){
-        fprintf(stdout,"function receive_Message_From_Server | trying open outputfile\n");
-    }
+            // Open file and write in it
+            if (feedback) {
+                fprintf(stdout, "function receive_Message_From_Server | trying open outputfile\n");
+            }
 
-    FILE *outputFile = fopen(fileName, "w");
-    if (outputFile == NULL) {
-        exit (-1);
-        // Exit on error function
-    }
+            FILE *outputFile = fopen(fileName, "w");
+            if (outputFile == NULL) {
+                exit(-1);
+                // Exit on error function
+            }
 
-    if (feedback){
-        fprintf(stdout,"function receive_Message_From_Server | successfully opened outputfile\n");
-    }
+            if (feedback) {
+                fprintf(stdout, "function receive_Message_From_Server | successfully opened outputfile\n");
+            }
 
-    if (read_File(fp_for_read,fileName,fileLength) < fileLength) {
+            if (read_File(fp_for_read, fileName, fileLength) < fileLength) {
 
-        fprintf(stderr, "Reached EOF unexpacted");
-        // Exit on error function
-        exit(-1);
+                fprintf(stderr, "Reached EOF unexpacted");
+                // Exit on error function
+                exit(-1);
 
-    }
+            }
+        }
+
     return 0;
 }
 
