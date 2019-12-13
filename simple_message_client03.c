@@ -80,7 +80,14 @@ int main (int argc, const char *argv []) {
     parse_arguments(argc,argv,&server, &port, &user, &message, &img_url, (int*)&verbose);
 
     socket_w = connect_with_server(server, port);
+    if (socket_w == 0) {
+        exit_on_error(0, "Connecting with server failed");
+    }
+    errno = 0;
     socket_r = dup(socket_w);
+    if (socket_r == ERROR) {
+        exit_on_error(errno, "Copying socket file descriptor failed");
+    }
 
     if (send_message_to_server(socket_w, message, user, img_url) != 0) {
         exit_on_error(0, "Sending message to server failed");
@@ -90,8 +97,18 @@ int main (int argc, const char *argv []) {
         exit_on_error(0, "Receive message from server failed");
     }
 
-    close (socket_w);
-    close (socket_r);
+    errno = 0;
+    int ret_close = close (socket_w);
+    if (ret_close == ERROR) {
+        fprintf(stderr, "%s: close() socket_w failed: %s\n", prog_name, strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+    errno = 0;
+    ret_close = close (socket_r);
+    if (ret_close == ERROR) {
+        fprintf(stderr, "%s: close() socket_r failed: %s\n", prog_name, strerror(errno));
+        exit(EXIT_FAILURE);
+    }
     return EXIT_SUCCESS;
 }
 
@@ -110,7 +127,7 @@ static int receive_message_from_server (int socket_file_descriptor) {
     FILE *fp_for_read = fdopen(socket_file_descriptor, "r");
     if (fp_for_read == NULL) {
         fclose(fp_for_read);
-        exit_on_error(errno, "Open reading file descriptor failed");
+        exit_on_error(errno, "fdopen() failed");
     }
 
     // Read "status=" from server response
@@ -120,6 +137,7 @@ static int receive_message_from_server (int socket_file_descriptor) {
 
     errno = 0;
     if (getline(&buffer, &length, fp_for_read) == ERROR) {
+        free(buffer);
         if (errno != 0) {
             fclose(fp_for_read);
             exit_on_error(errno, "Reading an entire line from stream failed");
@@ -132,12 +150,13 @@ static int receive_message_from_server (int socket_file_descriptor) {
 
     int ret_sscanf = sscanf(buffer, "status=%d", &status);
     if (ret_sscanf == 0 || ret_sscanf == EOF) {
+        free(buffer);
         fclose(fp_for_read);
-        exit_on_error(errno, "Reading status code from stream failed");
+        exit_on_error(0, "sscanf() status= failed");
     }
-    free(buffer);
 
     if (status != 0) {
+        free(buffer);
         fclose(fp_for_read);
         close(socket_w);
         close(socket_r);
@@ -145,64 +164,68 @@ static int receive_message_from_server (int socket_file_descriptor) {
         exit(status);
     }
 
-    // Read "file=" from server response
-    buffer = NULL;
-    length = 0;
+    // Read file= and len= from server response
     char *fileName = NULL;
+    unsigned long fileLength = 0;
 
     while (getline(&buffer, &length, fp_for_read) != ERROR) {
 
         fileName = malloc(sizeof(char) * strlen(buffer));
         if (fileName == NULL) {
-            exit(-1);
-            // Exit on error function
+            free(buffer);
+            fclose(fp_for_read);
+            exit_on_error(0, "malloc() failed");
         }
-        fileName[0] = '\0';
+        memset(fileName, 0, sizeof(char));
 
         ret_sscanf = sscanf(buffer, "file=%s", fileName);
         if (ret_sscanf == 0 || ret_sscanf == EOF) {
-            exit(-1);
-            // Exit on error function
+            free(buffer);
+            fclose(fp_for_read);
+            exit_on_error(0, "sscanf() file= failed");
         }
-        free(buffer);
 
         if (strlen(fileName) == 0) {
-            exit(-1);
-            // Exit on error function
+            free(buffer);
+            fclose(fp_for_read);
+            exit_on_error(0, "Reading filename from server response failed");
         }
-
-        // Read "len=" from server response
-        buffer = NULL;
-        length = 0;
-        unsigned long fileLength = 0;
 
         errno = 0;
         if (getline(&buffer, &length, fp_for_read) == ERROR) {
-            exit(-1);
-            // Exit on error function
-            // Check if errno != 0 or EOF
+            free(buffer);
+            if (errno != 0) {
+                fclose(fp_for_read);
+                exit_on_error(errno, "Reading an entire line from stream failed");
+            }
+            // EOF found
+            else {
+                return 0;
+            }
         }
 
         ret_sscanf = sscanf(buffer, "len=%lu", &fileLength);
         if (ret_sscanf == 0 || ret_sscanf == EOF) {
-            exit(-1);
-            // Exit on error function
+            free(buffer);
+            fclose(fp_for_read);
+            exit_on_error(0, "sscanf() len= failed");
         }
-        free(buffer);
 
         // Open file and write in it
         FILE *outputFile = fopen(fileName, "w");
         if (outputFile == NULL) {
-            exit(-1);
-            // Exit on error function
+            free(buffer);
+            fclose(fp_for_read);
+            exit_on_error(0, "fopen () outputFile failed");
         }
 
         if (read_file(fp_for_read, fileName, fileLength) < fileLength) {
-            fprintf(stderr, "Reached EOF unexpacted");
-            // Exit on error function
-            exit(-1);
+            free(buffer);
+            fclose(fp_for_read);
+            exit_on_error(0, "Reached EOF unexpected");
         }
     }
+    free(buffer);
     return 0;
 }
 
