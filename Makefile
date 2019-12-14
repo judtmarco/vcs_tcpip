@@ -1,125 +1,83 @@
 ##
 ## @file Makefile
-## Makefile for VCS TCP/IP bulletin board exercise.
+## BIC-3 Verteilte Systeme
+## simple_message_client & simple_message_server
 ##
-## In the course "Verteilte Computer Systeme" the students shall
-## implement a bulletin board. It shall consist of a spawning TCP/IP
-## server which executes the business logic provided by the lector,
-## and a suitable TCP/IP client.
+## Judt Marco: ic18b39@technikum-wien.at
+## Hinterberger Andreas: ic18b008@technikum-wien.at
 ##
-## This is the Makefile for the reference implementation.
-##
-## @author Thomas M. Galla <galla@technikum-wien.at>
-## @date 2014/08/22
-##
-
--include global.mak
--include ../global.mak
+## Manuel:
+## 		- "$ make" compile the c-files
+##		- "$ make doc" creat doxygen document
+##      - "$ make clean" remove object files 
+##		- "$ make cleanexe" remove executeables
 
 ##
 ## ------------------------------------------------------------- variables --
 ##
 
-# override install dir for manual page
-INSTALL_MAN_DIR := $(INSTALL_BASE_DIR)/man/man3
+CC=gcc
+CFLAGS=-DDEBUG -Wall -pedantic -Werror -Wextra -Wstrict-prototypes -Wformat=2 -fno-common -ftrapv -g -O3 -std=gnu11
+CP=cp
+CD=cd
+MV=mv
+GREP=grep
+DOXYGEN=doxygen
+EXCLUDE_PATTERN=footrulewidth
 
-PACKAGE := libsimple_message_client_commandline_handling
 
-OBJECTS := \
-	simple_message_client_commandline_handling.o
 
-ARCHIVE_SOURCES := \
-	simple_message_client_commandline_handling.c \
-	simple_message_client_commandline_handling.h \
-	smc_parsecommandline.3 \
-	Makefile \
-	global.mak \
-        doxygen.dcf \
-	README.txt
 
-SYMLINKS := \
-	global.mak
+##
+## ----------------------------------------------------------------- rules --
+##
 
-GLOBAL_MAK := \
-	$(wildcard ../global.mak)
-
-ARCHIVES := $(foreach EXT,zip tar.gz,$(PACKAGE).$(EXT))
-
-LIBRARIES := \
-	$(PACKAGE).a
-
-MANPAGES := \
-	smc_parsecommandline.3
-
-HEADERS := \
-	simple_message_client_commandline_handling.h
-
-CFLAGS := $(CFLAGS11)
-LFLAGS :=
+%.o: %.c
+	$(CC) $(CFLAGS) -c $<
 
 ##
 ## --------------------------------------------------------------- targets --
 ##
 
-all: symlinks libs archs html
+.PHONY: all
+all: simple_message_server simple_message_client
 
-symlinks: $(SYMLINKS)
+simple_message_server: simple_message_server.o
+	$(CC) $(CFLAGS) -o "$@" "$^"
 
-libs: $(LIBRARIES)
 
-archs: $(ARCHIVES)
+simple_message_client: simple_message_client.o simple_message_client_commandline_handling.o
+	$(CC) $(CFLAGS) -o "$@" "simple_message_client.o" "simple_message_client_commandline_handling.o"
 
-$(PACKAGE).a: $(OBJECTS)
-	$(AR) -rcs $@ $^ 
-
-global.mak: $(GLOBAL_MAK)
-	$(LN) $< $@
 
 clean:
-	$(RM) $(OBJECTS) *~
+	rm -rf *.a
+	rm -rf *.o
 
-clobber: clean
-	$(RM) $(LIBRARIES) $(ARCHIVES)
+cleanexe:
+	rm -rf simple_message_client simple_message_server
 
-distclean: clobber
-	$(RM) -r doc $(SYMLINKS)
-
-$(PACKAGE).zip: $(ARCHIVE_SOURCES)
-	$(CD) ..; $(ZIP) -r $(PACKAGE)/$@ $(foreach src,$^,$(PACKAGE)/$(src))
-
-$(PACKAGE).tar.gz: $(ARCHIVE_SOURCES)
-	$(CD) ..; $(TAR) -czhf $(PACKAGE)/$@ $(foreach src,$^,$(PACKAGE)/$(src))
 
 doc: html pdf
 
-html: doc/html/index.html
-
-doc/html/index.html doc/latex/refman.tex: doxygen.dcf
+.PHONY: html
+html:
 	$(DOXYGEN) doxygen.dcf
 
-pdf: html doc/latex/refman.pdf
-doc/latex/refman.pdf: doc/latex/refman.tex
-	$(CD) doc/latex; \
-	$(MV) refman.tex refman_save.tex; \
-	$(GREP) -v $(EXCLUDE_PATTERN) refman_save.tex > refman.tex; \
-	$(RM) refman_save.tex; \
-	make; \
-	$(MV) refman.pdf refman.save; \
+pdf: html
+	$(CD) doc/pdf && \
+	$(MV) refman.tex refman_save.tex && \
+	$(GREP) -v $(EXCLUDE_PATTERN) refman_save.tex > refman.tex && \
+	$(RM) refman_save.tex && \
+	make && \
+	$(MV) refman.pdf refman.save && \
 	$(RM) *.pdf *.html *.tex *.aux *.sty *.log *.eps *.out *.ind *.idx \
-	      *.ilg *.toc *.tps *.ttf Makefile; \
+	      *.ilg *.toc *.tps Makefile && \
 	$(MV) refman.save refman.pdf
-
-install: libs archs $(MANPAGES) $(HEADERS)
-	for i in $(LIBRARIES); do $(INSTALL) -D -m 0644 $$i $(INSTALL_LIB_DIR)/$$i; done
-	for i in $(MANPAGES); do $(INSTALL) -D -m 0644 $$i $(INSTALL_MAN_DIR)/$$i; done
-	for i in $(ARCHIVES); do $(INSTALL) -D -m 0644 $$i $(INSTALL_SRC_DIR)/$$i; done
-	for i in $(HEADERS); do $(INSTALL) -D -m 0644 $$i $(INSTALL_HDR_DIR)/$$i; done
 
 ##
 ## ---------------------------------------------------------- dependencies --
 ##
-
-simple_message_client_commandline_handling.o: simple_message_client_commandline_handling.c simple_message_client_commandline_handling.h Makefile
 
 ##
 ## =================================================================== eof ==
