@@ -1,16 +1,15 @@
-/**
- *  @file simple_message_client.c
+/** \file 
+ *  simple_message_client.c
  *  TCP/IP project for BIC-3 Verteilte Systeme
  *
  *  @author Hinterberger Andreas <ic18b008@technikum-wien.at>
- *  @author Judt Marco <ic18b0xx@technikum-wien.at>
+ *  @author Judt Marco <ic18b039@technikum-wien.at>
  *
  *  @git https://github.com/judtmarco/vcs_tcpip
  *  @date 11/25/2019
  *  @version FINAL
  *
- *  @TODO Testcases
- *  @TODO Comments
+ *  
  */
 
 /*
@@ -18,11 +17,9 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <netdb.h>
-#include <memory.h>
 #include <unistd.h>
 #include <errno.h>
 
@@ -77,6 +74,7 @@ int main (int argc, const char *argv []) {
     const char *user = NULL;
     const char *message = NULL;
     const char *img_url = NULL;
+
     parse_arguments(argc,argv,&server, &port, &user, &message, &img_url, (int*)&verbose);
 
     socket_w = connect_with_server(server, port);
@@ -166,7 +164,7 @@ static int receive_message_from_server (void) {
         exit(status);
     }
 
-    // Read file= and len= from server response
+    // Read file= and len= from server response and call function read_file
     char *fileName = NULL;
     unsigned long fileLength = 0;
 
@@ -254,12 +252,13 @@ static size_t read_file (FILE *fp ,char *filename, size_t lenght){
     char buffer [BUF_SIZE] = {'\0'};
 
     errno = 0;
+    // Open the output-file with the given name
     FILE *output_file = fopen(filename,"w");
     if (output_file == NULL) {
         fclose(output_file);
         exit_on_error(errno, "fopen() output_file failed");
     }
-
+    // Read and write step by step through the file, based on the given length 
     while (lenght != 0){
         if (lenght > BUF_SIZE) {
             to_read = BUF_SIZE;
@@ -329,7 +328,7 @@ static int send_message_to_server(const char *message, const char *user, const c
         }
         fclose(fp_for_write);
 
-    // Sending message with img-URL
+        // Sending message with img-URL
     } else {
         if (fprintf(fp_for_write, "user=%s\nimg=%s\n%s\n", user, img_url, message) < 0) {
             fclose(fp_for_write);
@@ -374,14 +373,14 @@ static int connect_with_server(const char *server_address, const char *server_po
     hints.ai_family = AF_UNSPEC;               /* IPv4 & IPv6 are possible */
     hints.ai_socktype = SOCK_STREAM;           /* Define socket for TCP */
     hints.ai_protocol = 0;                     /* Define for the returned socket any possible protocol */
-    hints.ai_flags = AI_ADDRCONFIG;            /* Takes my IP Address */
+    hints.ai_flags = AI_ADDRCONFIG;            /* Define if host offers at least one IPv4 or/and IPv6 address */
     hints.ai_canonname = NULL;
     hints.ai_addr = NULL;
     hints.ai_next = NULL;
 
     /*
-     * getaddrinfo gets the server address, the port and hints (in hints are all the importent information).
-     * It writes the result as a pointer into the struct serverinfo.
+     * getaddrinfo gets the server address, the port and hints (which includes the parameters set above).
+     * The result get into the struct: serverinfo.
      */
     errno = 0;
     ret_getaddrinfo = getaddrinfo(server_address, server_port, &hints, &serverinfo);
