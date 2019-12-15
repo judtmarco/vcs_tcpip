@@ -1,5 +1,5 @@
 /**
- * @file simple_message_server.c
+ * \file simple_message_server.c
  * VCS TCP/IP Aufgabe 3: Implementierung Server
  *
  * @author Marco Judt (ic18b039@technikum-wien.at)
