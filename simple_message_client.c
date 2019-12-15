@@ -79,10 +79,10 @@ int main (int argc, const char *argv []) {
     const char *img_url = NULL;
     parse_arguments(argc,argv,&server, &port, &user, &message, &img_url, (int*)&verbose);
 
-    socket_w = connect_with_server(server, port);
-    if (socket_w == 0) {
+    if (connect_with_server(server, port) != 0) {
         exit_on_error(0, "Connecting with server failed");
     }
+
     errno = 0;
     socket_r = dup(socket_w);
     if (socket_r == ERROR) {
@@ -368,7 +368,6 @@ static int connect_with_server(const char *server_address, const char *server_po
 
     struct addrinfo hints;
     struct addrinfo *serverinfo, *rp;
-    int ret_getaddrinfo, socket_file_descriptor;
 
     memset(&hints, 0, sizeof(hints));          /* Fill all the memory of hints with zeros */
     hints.ai_family = AF_UNSPEC;               /* IPv4 & IPv6 are possible */
@@ -384,7 +383,7 @@ static int connect_with_server(const char *server_address, const char *server_po
      * It writes the result as a pointer into the struct serverinfo.
      */
     errno = 0;
-    ret_getaddrinfo = getaddrinfo(server_address, server_port, &hints, &serverinfo);
+    int ret_getaddrinfo = getaddrinfo(server_address, server_port, &hints, &serverinfo);
     if (ret_getaddrinfo != 0) {
         exit_on_error(errno, "getaddrinfo() failed");
     }
@@ -395,13 +394,13 @@ static int connect_with_server(const char *server_address, const char *server_po
      */
     for (rp = serverinfo; rp != NULL; rp = rp->ai_next){
 
-        socket_file_descriptor = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-        if (socket_file_descriptor == ERROR) {
+        socket_w = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+        if (socket_w == ERROR) {
             continue;
         }
 
-        if (connect(socket_file_descriptor, rp->ai_addr, rp->ai_addrlen) == ERROR){
-            close(socket_file_descriptor);
+        if (connect(socket_w, rp->ai_addr, rp->ai_addrlen) == ERROR){
+            close(socket_w);
             continue;
         }
         break;
@@ -413,7 +412,7 @@ static int connect_with_server(const char *server_address, const char *server_po
         exit_on_error(0, "Connection to server failed");
     }
 
-    return socket_file_descriptor;
+    return 0;
 }
 
 /**

@@ -29,15 +29,14 @@
  * --------------------------------------------------------------- defines --
  */
 #define LISTEN_BACKLOG 10 /* Maximum length to which the queue of pending connections may grow */
-#define MIN_PORTNUMBER 1023 /* If under 1024 (well-known ports) - bind() fails */
-#define MAX_PORTNUMBER 65536
+#define MAX_PORTNUMBER 65535
 #define ERROR -1
 
 /*
  * --------------------------------------------------------------- globals --
  */
 const char *prog_name = ""; /* To save the program name and display it in usage and error function */
-int socket_fd = 0; /* File descriptor for connection with client - global to access it in create and error function */
+int listening_socket = 0; /* File descriptor for connection with client - global to access it in create and error function */
 
 /*
  * ------------------------------------------------------------- prototypes --
@@ -64,8 +63,7 @@ int main (const int argc, char* const argv[])
 {
     prog_name = argv[0];
 
-    if (argc < 2)
-    {
+    if (argc < 2) {
         usage();
         return EXIT_FAILURE;
     }
@@ -83,17 +81,19 @@ int main (const int argc, char* const argv[])
     while ((opt = getopt_long(argc, argv, "p:h", long_options, NULL)) != ERROR) {
         switch (opt) {
             case 'p':
-                errno = 0;
+                printf("%d", errno);
                 port = strtol(optarg, &strtol_ptr, 10); /* Convert given port to long int */
                 if (errno != 0) {
                     exit_on_error(errno, "strtol() failed");
                 }
                 /* Check if Port is in range and check the next value after numerical value (has to be \0) */
-                if(port <= MIN_PORTNUMBER || port >= MAX_PORTNUMBER || *strtol_ptr != '\0') {
+                if(port < 0 || port > MAX_PORTNUMBER || *strtol_ptr != '\0') {
                     exit_on_error(0, "port is invalid");
                 }
                 // Create and setup a socket
-                socket_fd = create_socket(optarg);
+                if (create_socket(optarg) != 0) {
+                    exit_on_error(0, "Creating socket failed");
+                }
                 break;
             case 'h':
                 usage();
@@ -130,16 +130,16 @@ int main (const int argc, char* const argv[])
     // Loop for incoming connections from client
     socklen_t client_addr_size;
     struct sockaddr_storage client_addr; /* Store socket address information */
-    int new_fd = 0;
+    int connected_socket = 0;
     while (1) {
         client_addr_size = sizeof(client_addr);
 
         errno = 0;
         /* Extract the first connection request on the queue of pending connections for the listening socket
          * and create new connected socket*/
-        new_fd = accept(socket_fd, (struct sockaddr *) &client_addr, &client_addr_size);
-        if (new_fd == ERROR) {
-            close (new_fd); /* Additionally close new connected socket */
+        connected_socket = accept(listening_socket, (struct sockaddr *) &client_addr, &client_addr_size);
+        if (connected_socket == ERROR) {
+            close (connected_socket); /* Additionally close new connected socket */
             exit_on_error(errno, "accept() failed");
         }
 
@@ -147,30 +147,30 @@ int main (const int argc, char* const argv[])
         /* Create new process by duplicating the calling process */
         pid_t cpid = fork();
         if (cpid == ERROR) {
-            close (new_fd); /* Additionally close new connected socket */
+            close (connected_socket); /* Additionally close new connected socket */
             exit_on_error(errno, "fork() failed");
         }
 
         // This is the child process
         if (cpid == 0) {
             errno = 0;
-            int ret_close = close (socket_fd); /* Child has to close listening socket */
+            int ret_close = close (listening_socket); /* Child has to close listening socket */
             if (ret_close == ERROR) {
                 exit_on_error(errno, "close() listening socket failed");
             }
 
             // Create copy of new connected socket file descriptor using STDIN and STDOUT
             errno = 0;
-            int ret_dup = dup2 (new_fd, STDIN_FILENO);
+            int ret_dup = dup2 (connected_socket, STDIN_FILENO);
             if (ret_dup == ERROR) {
-                close (new_fd); /* Additionally close new connected socket */
+                close (connected_socket); /* Additionally close new connected socket */
                 exit_on_error(errno, "dup2() failed");
             }
 
             errno = 0;
-            int ret_dup2 = dup2 (new_fd, STDOUT_FILENO);
+            int ret_dup2 = dup2 (connected_socket, STDOUT_FILENO);
             if (ret_dup2 == ERROR) {
-                close (new_fd); /* Additionally close new connected socket */
+                close (connected_socket); /* Additionally close new connected socket */
                 exit_on_error(errno, "dup2() failed");
             }
 
@@ -179,12 +179,12 @@ int main (const int argc, char* const argv[])
             int ret_execlp = execlp("simple_message_server_logic", "simple_message_server_logic", NULL);
             if (ret_execlp == ERROR)
             {
-                close (new_fd); /* Additionally close new connected socket */
+                close (connected_socket); /* Additionally close new connected socket */
                 exit_on_error(errno, "execlp() failed");
             }
 
             /* Close connected socket when done */
-            ret_close = close (new_fd);
+            ret_close = close (connected_socket);
             if (ret_close == ERROR) {
                 exit_on_error(errno, "close() connected socket failed");
             }
@@ -193,7 +193,7 @@ int main (const int argc, char* const argv[])
         // This is the parent process
         else {
             errno = 0;
-            int ret_close = close (new_fd); /* Parent has to close connected socket */
+            int ret_close = close (connected_socket); /* Parent has to close connected socket */
             if (ret_close == ERROR) {
                 exit_on_error(errno, "close() connected socket failed");
             }
@@ -233,8 +233,8 @@ static void usage(void)
 \return void
 */
 static void exit_on_error (int error, char* message) {
-    if (socket_fd != 0) {
-        close(socket_fd);
+    if (listening_socket != 0) {
+        close(listening_socket);
     }
 
     if (error != 0) {
@@ -254,12 +254,12 @@ static void exit_on_error (int error, char* message) {
 * Lastly, the socket is configured to be a server listening socket.
 *
 \param port The specified server port given with command line arguments
-\return socket_fd The created socket file descriptor
+\return listening_socket The created socket file descriptor
 */
 static int create_socket (char *port) {
     struct addrinfo hints;
-    struct addrinfo *result;
-    int ret_getaddrinfo, ret_bind, ret_listen, ret_sockopt;
+    struct addrinfo *result, *rp;
+    int ret_getaddrinfo, ret_listen, ret_sockopt;
 
     /* Load up address structs with getaddrinfo */
     memset(&hints, 0, sizeof(struct addrinfo));
@@ -277,37 +277,45 @@ static int create_socket (char *port) {
         exit_on_error(errno, "getaddrinfo() failed");
     }
 
+    /* getaddrinfo() returns a list of address structures.
+       Try each address until we successfully bind(2).
+       If socket(2) (or bind(2)) fails, we (close the socket
+       and) try the next address. */
+
     /* Create a socket */
-    errno = 0;
-    socket_fd = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
-    if (socket_fd == ERROR) {
-        exit_on_error(errno, "socket() failed");
+    for (rp = result; rp != NULL; rp = rp->ai_next) {
+        listening_socket = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
+        if (listening_socket == ERROR) {
+            continue;
+        }
+
+        /* Set the socket options - SOL_SOCKET needs to be set to set options at the socket level;
+         * SO_REUSEADDR allows reuse of local addresses*/
+        errno = 0;
+        int optval = 1;
+        ret_sockopt = setsockopt(listening_socket, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
+        if (ret_sockopt == ERROR) {
+            exit_on_error(errno, "setsockopt() failed");
+        }
+
+        /* Bind socket to the specified port */
+        if (bind(listening_socket, result->ai_addr, result->ai_addrlen) == 0) {
+            break; // Success
+        }
     }
 
-    /* // Bind socket to the specified port */
-    errno = 0;
-    ret_bind = bind(socket_fd, result->ai_addr, result->ai_addrlen);
-    if (ret_bind != 0) {
-        exit_on_error(errno, "bind() failed");
+    freeaddrinfo(result);           /* No longer needed */
+    if (rp == NULL) {
+        exit_on_error(0, "No address succeeded");
     }
 
-    /* Set the socket options - SOL_SOCKET needs to be set to set options at the socket level;
-     * SO_REUSEADDR allows reuse of local addresses*/
+    /* Set listening_socket up to be a server (listening) socket */
     errno = 0;
-    int optval = 1;
-    ret_sockopt = setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
-    if (ret_sockopt == ERROR) {
-        exit_on_error(errno, "setsockopt() failed");
-    }
-
-    /* Set socket_fd up to be a server (listening) socket */
-    errno = 0;
-    ret_listen = listen(socket_fd, LISTEN_BACKLOG);
+    ret_listen = listen(listening_socket, LISTEN_BACKLOG);
     if (ret_listen != 0) {
         exit_on_error(errno, "listen() failed");
     }
-
-    return socket_fd;
+    return 0;
 }
 
 /**
