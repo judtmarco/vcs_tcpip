@@ -1,6 +1,6 @@
 /**
  * \file simple_message_server.c
- * VCS TCP/IP Aufgabe 3: Implementierung Server
+ * TCP/IP project for BIC-3 Verteilte Systeme
  *
  * @author Marco Judt (ic18b039@technikum-wien.at)
  * @author Andreas Hinterberger (ic18b008@technikum-wien.at)
@@ -19,7 +19,6 @@
 #include <string.h>
 #include <unistd.h>
 #include <getopt.h>
-#include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
 #include <signal.h>
@@ -53,7 +52,7 @@ static void sigchild_handler (int sig);
 * \brief Main function of simple_message.server.c
 *
 * This is the start of the code. Commandline arguments are checked and parsed with getopt_long. Signal handler for child process
-* is initialized and loop for incoming connections is done.
+* is initialized and loop for incoming connections is handled.
 *
 \param argc Contains number of arguments
 \param argv An Array of char const pointer with the command line arguments
@@ -81,12 +80,11 @@ int main (const int argc, char* const argv[])
     while ((opt = getopt_long(argc, argv, "p:h", long_options, NULL)) != ERROR) {
         switch (opt) {
             case 'p':
-                printf("%d", errno);
                 port = strtol(optarg, &strtol_ptr, 10); /* Convert given port to long int */
                 if (errno != 0) {
                     exit_on_error(errno, "strtol() failed");
                 }
-                /* Check if Port is in range and check the next value after numerical value (has to be \0) */
+                /* Check if port is in range and check the next value after numerical value (has to be \0) */
                 if(port < 0 || port > MAX_PORTNUMBER || *strtol_ptr != '\0') {
                     exit_on_error(0, "port is invalid");
                 }
@@ -111,6 +109,7 @@ int main (const int argc, char* const argv[])
     memset (&sa, 0, sizeof(sa)); /* Set sa to 0 to not be undefined */
     sa.sa_handler = sigchild_handler; /* Configure signal handler with sigchild_handler to reap all dead processes */
 
+    // Manipulate POSIX signal sets
     errno = 0;
     int ret_sigemptyset = sigemptyset(&sa.sa_mask); /* Initializes the signal set to empty */
     if (ret_sigemptyset == ERROR) {
@@ -119,7 +118,7 @@ int main (const int argc, char* const argv[])
 
     /* sa_flags is a set of flags which modify the behavior of the signal
      * SA_RESTART = Provide behavior compatible with BSD signal semantics by making certain system calls restartable across signals */
-    sa.sa_flags = SA_RESTART;
+    sa.sa_flags = SA_RESTART; /* Necessary when establishing a signal handler */
 
     errno = 0;
     int ret_sigaction = sigaction(SIGCHLD, &sa, NULL); /* Change the action taken by process on receipt of a specific signal */
@@ -159,7 +158,7 @@ int main (const int argc, char* const argv[])
                 exit_on_error(errno, "close() listening socket failed");
             }
 
-            // Create copy of new connected socket file descriptor using STDIN and STDOUT
+            /* Create copy of new connected socket file descriptor using STDIN and STDOUT */
             errno = 0;
             int ret_dup = dup2 (connected_socket, STDIN_FILENO);
             if (ret_dup == ERROR) {
@@ -174,9 +173,9 @@ int main (const int argc, char* const argv[])
                 exit_on_error(errno, "dup2() failed");
             }
 
-            // Execute the business logic
+            /* Execute the business logic */
             errno = 0;
-            int ret_execlp = execlp("simple_message_server_logic", "simple_message_server_logic", NULL);
+            int ret_execlp = execl("simple_message_server_logic", "simple_message_server_logic", NULL);
             if (ret_execlp == ERROR)
             {
                 close (connected_socket); /* Additionally close new connected socket */
@@ -229,7 +228,7 @@ static void usage(void)
 * error message with or without on stderr. Exits the program.
 *
 \param error Error code to display in the error message
-\param message Message what went wrong
+\param message Message with information on what went wrong
 \return void
 */
 static void exit_on_error (int error, char* message) {
@@ -254,18 +253,17 @@ static void exit_on_error (int error, char* message) {
 * Lastly, the socket is configured to be a server listening socket.
 *
 \param port The specified server port given with command line arguments
-\return listening_socket The created socket file descriptor
+\return 0 If Successfully created a socket
 */
 static int create_socket (char *port) {
-    struct addrinfo hints;
-    struct addrinfo *result, *rp;
+    struct addrinfo hints, *result, *rp;
     int ret_getaddrinfo, ret_listen, ret_sockopt;
 
     /* Load up address structs with getaddrinfo */
     memset(&hints, 0, sizeof(struct addrinfo));
     hints.ai_family = AF_INET;    /* Allow only IPv4 */
     hints.ai_socktype = SOCK_STREAM; /* Bytestream socket */
-    hints.ai_flags = AI_PASSIVE;    /* For wildcard IP address */
+    hints.ai_flags = AI_PASSIVE;    /* For wildcard IP address to bind socket*/
     hints.ai_protocol = 0;          /* Any protocol */
     hints.ai_canonname = NULL;
     hints.ai_addr = NULL;
@@ -277,10 +275,9 @@ static int create_socket (char *port) {
         exit_on_error(errno, "getaddrinfo() failed");
     }
 
-    /* getaddrinfo() returns a list of address structures.
-       Try each address until we successfully bind(2).
-       If socket(2) (or bind(2)) fails, we (close the socket
-       and) try the next address. */
+    /* Given the port getaddrinfo() returns a list of address structures.
+       Try each address until we successfully bind.
+       If socket (or bind) fails, we close the socket and try the next address.*/
 
     /* Create a socket */
     for (rp = result; rp != NULL; rp = rp->ai_next) {
@@ -289,8 +286,9 @@ static int create_socket (char *port) {
             continue;
         }
 
-        /* Set the socket options - SOL_SOCKET needs to be set to set options at the socket level;
-         * SO_REUSEADDR allows reuse of local addresses*/
+        /* Set the socket options
+         * SOL_SOCKET needs to be set to manipulate options at the sockets API level;
+         * SO_REUSEADDR allows reuse of local addresses: Allows other sockets to bind to this port; Avoids "Address already in use" error */
         errno = 0;
         int optval = 1;
         ret_sockopt = setsockopt(listening_socket, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
@@ -302,6 +300,7 @@ static int create_socket (char *port) {
         if (bind(listening_socket, result->ai_addr, result->ai_addrlen) == 0) {
             break; // Success
         }
+        close(listening_socket);
     }
 
     freeaddrinfo(result);           /* No longer needed */
@@ -309,10 +308,10 @@ static int create_socket (char *port) {
         exit_on_error(0, "No address succeeded");
     }
 
-    /* Set listening_socket up to be a server (listening) socket */
+    /* Set listening_socket up to be a passive server (listening) socket */
     errno = 0;
     ret_listen = listen(listening_socket, LISTEN_BACKLOG);
-    if (ret_listen != 0) {
+    if (ret_listen == ERROR) {
         exit_on_error(errno, "listen() failed");
     }
     return 0;

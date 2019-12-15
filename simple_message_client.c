@@ -1,15 +1,13 @@
-/** \file 
- *  simple_message_client.c
- *  TCP/IP project for BIC-3 Verteilte Systeme
+/**
+ * \file simple_message_client.c
+ * TCP/IP project for BIC-3 Verteilte Systeme
  *
- *  @author Hinterberger Andreas <ic18b008@technikum-wien.at>
- *  @author Judt Marco <ic18b039@technikum-wien.at>
+ * @author Hinterberger Andreas <ic18b008@technikum-wien.at>
+ * @author Judt Marco <ic18b039@technikum-wien.at>
  *
- *  @git https://github.com/judtmarco/vcs_tcpip
- *  @date 11/25/2019
- *  @version FINAL
- *
- *  
+ * @git https://github.com/judtmarco/vcs_tcpip
+ * @date 11/25/2019
+ * @version FINAL
  */
 
 /*
@@ -38,7 +36,6 @@
  * -------------------------------------------------------------- globals --
  */
 const char *prog_name = "";
-static int verbose;
 int socket_w = 0;
 int socket_r = 0;
 
@@ -51,15 +48,15 @@ static int connect_with_server(const char *server_address, const char *server_po
 static int send_message_to_server(const char *message, const char *user, const char *img_url);
 static int receive_message_from_server(void);
 static void exit_on_error (int error, char* message);
-static size_t read_file (FILE *fp, char *filename, size_t lenght);
+static size_t read_file (FILE *fp, char *filename, size_t length);
 
 /*
  * -------------------------------------------------------------- functions --
  */
 /**
-* \brief main function defines the function flow
+* \brief Main function defines the function flow
 *
-* main function makes a sequential call of the functions: parse_arguments, connect_with_server,
+* Main function makes a sequential call of the functions: parse_arguments, connect_with_server,
 * send_message_to_server and receive_message_from_server.
 \param argc number of arguments
 \param argv vector with the given arguments
@@ -74,8 +71,9 @@ int main (int argc, const char *argv []) {
     const char *user = NULL;
     const char *message = NULL;
     const char *img_url = NULL;
+    int verbose;
 
-    parse_arguments(argc,argv,&server, &port, &user, &message, &img_url, (int*)&verbose);
+    parse_arguments(argc,argv,&server, &port, &user, &message, &img_url, &verbose);
 
     if (connect_with_server(server, port) != 0) {
         exit_on_error(0, "Connecting with server failed");
@@ -111,9 +109,9 @@ int main (int argc, const char *argv []) {
 }
 
 /**
-* \brief handle the recivied message from the server
+* \brief Handle the received message from the server
 *
-* Functions open filedescriptor for reading the responses from file.
+* Function opens file descriptor for reading the responses from file.
 * Reading in status, file and length from server.
 * Gives the length and the filename to the function read_file.
 *
@@ -230,20 +228,19 @@ static int receive_message_from_server (void) {
 }
 
 /**
-* \brief reading and writing down the file
+* \brief Reading and writing down the file
 *
 * Function open the file where to write down the file given by the server based on the filename.
 * In while reading in the file and write it into the outputfile, step by step.
-* The while is needed to calculate if the read bythes matches the given bytes by the server.
+* The while is needed to calculate if the read bytes matches the given bytes by the server.
 *
-*
-\param *fp is the filedescriptor for reading out of the file
+\param *fp is the file descriptor for reading out of the file
 \param *filename is the given name for the file which will be written down
-\param lenght is the size of the file in byte which will be read from the server and then written down
-\return -1 if failure occured or the read file lenght is not the same as given from parameter lenght
-\return the writen bytes, which should be the same as given by parameter lenght
+\param length is the size of the file in byte which will be read from the server and then written down
+\return -1 if failure occurred or the read file length is not the same as given from parameter length
+\return the written bytes, which should be the same as given by parameter length
 */
-static size_t read_file (FILE *fp ,char *filename, size_t lenght){
+static size_t read_file (FILE *fp ,char *filename, size_t length){
 
     size_t to_read = 0;
     size_t already_read = 0;
@@ -259,12 +256,12 @@ static size_t read_file (FILE *fp ,char *filename, size_t lenght){
         exit_on_error(errno, "fopen() output_file failed");
     }
     // Read and write step by step through the file, based on the given length 
-    while (lenght != 0){
-        if (lenght > BUF_SIZE) {
+    while (length != 0){
+        if (length > BUF_SIZE) {
             to_read = BUF_SIZE;
         }
         else {
-            to_read = lenght;
+            to_read = length;
         }
 
         already_read = fread(buffer, sizeof(char), to_read, fp);
@@ -279,7 +276,7 @@ static size_t read_file (FILE *fp ,char *filename, size_t lenght){
             exit_on_error(0, "fwrite() wrote wrong amount of characters");
         }
         already_write += to_write;
-        lenght -= to_read;
+        length -= to_read;
     }
     fclose(output_file);
     return (already_write);
@@ -288,7 +285,7 @@ static size_t read_file (FILE *fp ,char *filename, size_t lenght){
 /**
 * \brief Sending a message to the server
 *
-* Function open a writing file descriptor based on the given socket.
+* Function opens a writing file descriptor based on the given socket.
 * After that the function distinguish between sending an image-URL or not.
 * The writing to the server is done via fprintf.
 * Afterwords the descriptor gets flushed, shutdown for writing and closed.
@@ -329,7 +326,8 @@ static int send_message_to_server(const char *message, const char *user, const c
         fclose(fp_for_write);
 
         // Sending message with img-URL
-    } else {
+    }
+    else {
         if (fprintf(fp_for_write, "user=%s\nimg=%s\n%s\n", user, img_url, message) < 0) {
             fclose(fp_for_write);
             exit_on_error(0, "fprintf() failed");
@@ -352,16 +350,16 @@ static int send_message_to_server(const char *message, const char *user, const c
 }
 
 /**
-* \brief function connects with handles the socket connection to the server
+* \brief Function connects with and handles the socket connection to the server
 *
-* Hearth of the function is getaddressinfo which writes the information into the struct serverinfo.
+* Heart of the function is getaddressinfo which writes the information into the struct serverinfo.
 * The struct hints the configurations based on the programmer.
-* Afterwords loop thrugh struct rp=serverinfo which is needed to find a socket between server and client.
+* Afterwords loop through struct rp=serverinfo which is needed to find a socket between server and client.
 *
 \param server_address provides the address of the server given by the user
 \param server_port provides the port of the server given by the user
-\return socket_file_descriptor is an integer of the socket which the program connects to if success
-\return -1 if failure occured
+\return 0 If successfully connected with a server
+\return -1 If failure occurred
 */
 static int connect_with_server(const char *server_address, const char *server_port) {
 
@@ -415,19 +413,19 @@ static int connect_with_server(const char *server_address, const char *server_po
 }
 
 /**
-* \brief parsing the commandline
+* \brief Parsing the commandline
 *
 * Parsing the commandline for all the needed parameters in simple_message_client.
 * (This function is given from simple_message_client_commandline_handler.h)
-* EXIT_FAILURE will get triggerd if server, port, message or user are NULL.
+* EXIT_FAILURE will get triggered if server, port, message or user are NULL.
 *
 \param argc argument counter
 \param *argv vector of given arguments
 \param **server address of the server
-\param **port serverport to communicate to
+\param **port port of the server to communicate to
 \param **user user who writes the message
-\param **message message written to the bulletboard
-\param **img_url url to image which should be desplayed on the bulledboard
+\param **message message written to the bulletinboard
+\param **img_url url to image which should be displayed on the bulletinboard
 \param *verbose printing out messages what is currently happening in the program (not supported)
 \return void
 */
@@ -442,13 +440,13 @@ void parse_arguments (int argc, const char *argv[], const char **server, const c
 }
 
 /**
-* \brief print out help informations for user
+* \brief Print out help informations for user
 *
-* function get called if a failure of smc_parsecommandline occured.
+* Function get called if a failure of smc_parsecommandline occurres.
 *
 *
-\param *fp defines the stream where the usage infromation should be written
-\param *prog_name definies the name of the executeable,
+\param *fp defines the stream where the usage information should be written
+\param *prog_name defines the name of the executable,
 \param exit_value given exit code for terminating program
 \return void
 */
@@ -466,14 +464,14 @@ void usage (FILE *fp, const char *prog_name, int exit_value) {
     exit(exit_value);
 }
 /**
-* \brief printing error information
+* \brief Printing error information
 *
-* Function prints out error information based on the given informations.
-* Closes the sockets and ends the programm.
+* Function prints out error information based on the given information.
+* Closes the sockets and ends the program.
 *
-\param error describes the error with an integer
-\param message describes the cause of the error
-\return EXIT_FAILURE since this function gets only called if an error occured
+\param error Error code to display in the error message
+\param message Message with information on what went wrong
+\return EXIT_FAILURE since this function gets only called if an error occurred
 */
 static void exit_on_error (int error, char* message) {
 
