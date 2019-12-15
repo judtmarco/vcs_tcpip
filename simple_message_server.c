@@ -1,5 +1,5 @@
 /**
- * \file simple_message_server.c
+ * @file simple_message_server.c
  * TCP/IP project for BIC-3 Verteilte Systeme
  *
  * @author Marco Judt (ic18b039@technikum-wien.at)

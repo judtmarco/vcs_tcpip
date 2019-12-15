@@ -1,5 +1,5 @@
 /**
- * \file simple_message_client.c
+ * @file simple_message_client.c
  * TCP/IP project for BIC-3 Verteilte Systeme
  *
  * @author Hinterberger Andreas <ic18b008@technikum-wien.at>
