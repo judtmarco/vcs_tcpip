@@ -30,6 +30,7 @@
 #define LISTEN_BACKLOG 10 /* Maximum length to which the queue of pending connections may grow */
 #define MAX_PORTNUMBER 65535
 #define ERROR -1
+#define RESET_ERRNO (errno=0)
 
 /*
  * --------------------------------------------------------------- globals --
@@ -69,6 +70,7 @@ int main (const int argc, char* const argv[])
 
     // Parse command line arguments with getopt_long
     int opt = 0;
+    int option_index = 0;
     long int port = 0;
     char *strtol_ptr = NULL;
     static struct option long_options[] = {
@@ -77,9 +79,10 @@ int main (const int argc, char* const argv[])
             {0,         0,                  0,   0 }
     };
 
-    while ((opt = getopt_long(argc, argv, "p:h", long_options, NULL)) != ERROR) {
+    while ((opt = getopt_long(argc, argv, "p:h", long_options, &option_index)) != ERROR) {
         switch (opt) {
             case 'p':
+                RESET_ERRNO;
                 port = strtol(optarg, &strtol_ptr, 10); /* Convert given port to long int */
                 if (errno != 0) {
                     exit_on_error(errno, "strtol() failed");
@@ -105,35 +108,41 @@ int main (const int argc, char* const argv[])
     }
 
     // Initializing signal handler for child process
-    struct sigaction sa;
+    struct sigaction sa; /* Contains information on how the signal is handled */
     memset (&sa, 0, sizeof(sa)); /* Set sa to 0 to not be undefined */
-    sa.sa_handler = sigchild_handler; /* Configure signal handler with sigchild_handler to reap all dead processes */
 
-    // Manipulate POSIX signal sets
-    errno = 0;
+    /* Configure signal handler with sigchild_handler to reap all dead processes
+     * sigchild_handler should be called when a signal occurs*/
+    sa.sa_handler = sigchild_handler;
+
+    /* Manipulate POSIX signal sets;
+     * sa_mask specifies the signals that are to be blocked while sigchild_handler is running */
+    RESET_ERRNO;
     int ret_sigemptyset = sigemptyset(&sa.sa_mask); /* Initializes the signal set to empty */
     if (ret_sigemptyset == ERROR) {
         exit_on_error(errno, "sigemptyset() failed");
     }
 
     /* sa_flags is a set of flags which modify the behavior of the signal
-     * SA_RESTART = Provide behavior compatible with BSD signal semantics by making certain system calls restartable across signals */
-    sa.sa_flags = SA_RESTART; /* Necessary when establishing a signal handler */
+     * SA_RESTART = Provide behavior compatible with BSD signal semantics by making certain system calls restartable across signals;
+     * Necessary when establishing a signal handler;
+     * If a system call is interrupted by this signal, it is automatically restarted. */
+    sa.sa_flags = SA_RESTART;
 
-    errno = 0;
-    int ret_sigaction = sigaction(SIGCHLD, &sa, NULL); /* Change the action taken by process on receipt of a specific signal */
+    RESET_ERRNO;
+    int ret_sigaction = sigaction(SIGCHLD, &sa, NULL); /* Change the action taken by process on receipt of a specific signal (SIGCHLD) */
     if (ret_sigaction == ERROR) {
         exit_on_error(errno, "sigaction() failed");
     }
 
     // Loop for incoming connections from client
     socklen_t client_addr_size;
-    struct sockaddr_storage client_addr; /* Store socket address information */
+    struct sockaddr_storage client_addr; /* Store socket address information of client */
     int connected_socket = 0;
     while (1) {
         client_addr_size = sizeof(client_addr);
 
-        errno = 0;
+        RESET_ERRNO;
         /* Extract the first connection request on the queue of pending connections for the listening socket
          * and create new connected socket*/
         connected_socket = accept(listening_socket, (struct sockaddr *) &client_addr, &client_addr_size);
@@ -142,7 +151,7 @@ int main (const int argc, char* const argv[])
             exit_on_error(errno, "accept() failed");
         }
 
-        errno = 0;
+        RESET_ERRNO;
         /* Create new process by duplicating the calling process */
         pid_t cpid = fork();
         if (cpid == ERROR) {
@@ -152,21 +161,21 @@ int main (const int argc, char* const argv[])
 
         // This is the child process
         if (cpid == 0) {
-            errno = 0;
+            RESET_ERRNO;
             int ret_close = close (listening_socket); /* Child has to close listening socket */
             if (ret_close == ERROR) {
                 exit_on_error(errno, "close() listening socket failed");
             }
 
             /* Create copy of new connected socket file descriptor using STDIN and STDOUT */
-            errno = 0;
+            RESET_ERRNO;
             int ret_dup = dup2 (connected_socket, STDIN_FILENO);
             if (ret_dup == ERROR) {
                 close (connected_socket); /* Additionally close new connected socket */
                 exit_on_error(errno, "dup2() failed");
             }
 
-            errno = 0;
+            RESET_ERRNO;
             int ret_dup2 = dup2 (connected_socket, STDOUT_FILENO);
             if (ret_dup2 == ERROR) {
                 close (connected_socket); /* Additionally close new connected socket */
@@ -174,8 +183,8 @@ int main (const int argc, char* const argv[])
             }
 
             /* Execute the business logic */
-            errno = 0;
-            int ret_execlp = execl("simple_message_server_logic", "simple_message_server_logic", NULL);
+            RESET_ERRNO;
+            int ret_execlp = execlp("simple_message_server_logic", "simple_message_server_logic", NULL);
             if (ret_execlp == ERROR)
             {
                 close (connected_socket); /* Additionally close new connected socket */
@@ -191,7 +200,7 @@ int main (const int argc, char* const argv[])
         }
         // This is the parent process
         else {
-            errno = 0;
+            RESET_ERRNO;
             int ret_close = close (connected_socket); /* Parent has to close connected socket */
             if (ret_close == ERROR) {
                 exit_on_error(errno, "close() connected socket failed");
@@ -261,15 +270,15 @@ static int create_socket (char *port) {
 
     /* Load up address structs with getaddrinfo */
     memset(&hints, 0, sizeof(struct addrinfo));
-    hints.ai_family = AF_INET;    /* Allow only IPv4 */
-    hints.ai_socktype = SOCK_STREAM; /* Bytestream socket */
-    hints.ai_flags = AI_PASSIVE;    /* For wildcard IP address to bind socket*/
-    hints.ai_protocol = 0;          /* Any protocol */
+    hints.ai_family = AF_INET;          /* Allow only IPv4 */
+    hints.ai_socktype = SOCK_STREAM;    /* Bytestream socket */
+    hints.ai_flags = AI_PASSIVE;        /* For wildcard IP address to bind socket*/
+    hints.ai_protocol = 0;              /* Any protocol */
+    hints.ai_addr = NULL;               /* Pointer to address and port number */
     hints.ai_canonname = NULL;
-    hints.ai_addr = NULL;
     hints.ai_next = NULL;
 
-    errno = 0;
+    RESET_ERRNO;
     ret_getaddrinfo = getaddrinfo(NULL, port, &hints, &result);
     if (ret_getaddrinfo != 0) {
         exit_on_error(errno, "getaddrinfo() failed");
@@ -287,17 +296,17 @@ static int create_socket (char *port) {
         }
 
         /* Set the socket options
-         * SOL_SOCKET needs to be set to manipulate options at the sockets API level;
+         * SOL_SOCKET needs to be set to manipulate options at the sockets API level (packet processing layer);
          * SO_REUSEADDR allows reuse of local addresses: Allows other sockets to bind to this port; Avoids "Address already in use" error */
-        errno = 0;
-        int optval = 1;
+        RESET_ERRNO;
+        int optval = 1; // In setsockopt pointer to an address with option values
         ret_sockopt = setsockopt(listening_socket, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
         if (ret_sockopt == ERROR) {
             exit_on_error(errno, "setsockopt() failed");
         }
 
-        /* Bind socket to the specified port */
-        if (bind(listening_socket, result->ai_addr, result->ai_addrlen) == 0) {
+        /* Bind socket to the specified port; define on which ip and port the server is waiting for requests */
+        if (bind(listening_socket, rp->ai_addr, rp->ai_addrlen) == 0) {
             break; // Success
         }
         close(listening_socket);
@@ -309,7 +318,7 @@ static int create_socket (char *port) {
     }
 
     /* Set listening_socket up to be a passive server (listening) socket */
-    errno = 0;
+    RESET_ERRNO;
     ret_listen = listen(listening_socket, LISTEN_BACKLOG);
     if (ret_listen == ERROR) {
         exit_on_error(errno, "listen() failed");

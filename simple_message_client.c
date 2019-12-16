@@ -31,6 +31,7 @@
  */
 #define BUF_SIZE 512
 #define ERROR -1
+#define RESET_ERRNO (errno=0)
 
 /*
  * -------------------------------------------------------------- globals --
@@ -62,7 +63,7 @@ static size_t read_file (FILE *fp, char *filename, size_t length);
 \param argv vector with the given arguments
 \return EXIT_SUCCESS if the program finishes normal
 */
-int main (int argc, const char *argv []) {
+int main (const int argc, const char *argv []) {
 
     prog_name = argv[0];
 
@@ -79,7 +80,8 @@ int main (int argc, const char *argv []) {
         exit_on_error(0, "Connecting with server failed");
     }
 
-    errno = 0;
+    // Create copy of the file descriptor
+    RESET_ERRNO;
     socket_r = dup(socket_w);
     if (socket_r == ERROR) {
         exit_on_error(errno, "Copying socket file descriptor failed");
@@ -93,13 +95,13 @@ int main (int argc, const char *argv []) {
         exit_on_error(0, "Receive message from server failed");
     }
 
-    errno = 0;
+    RESET_ERRNO;
     int ret_close = close (socket_w);
     if (ret_close == ERROR) {
         fprintf(stderr, "%s: close() socket_w failed: %s\n", prog_name, strerror(errno));
         exit(EXIT_FAILURE);
     }
-    errno = 0;
+    RESET_ERRNO;
     ret_close = close (socket_r);
     if (ret_close == ERROR) {
         fprintf(stderr, "%s: close() socket_r failed: %s\n", prog_name, strerror(errno));
@@ -121,7 +123,7 @@ int main (int argc, const char *argv []) {
 static int receive_message_from_server (void) {
 
     // Open reading file descriptor
-    errno = 0;
+    RESET_ERRNO;
     FILE *fp_for_read = fdopen(socket_r, "r");
     if (fp_for_read == NULL) {
         fclose(fp_for_read);
@@ -133,14 +135,14 @@ static int receive_message_from_server (void) {
     size_t length = 0;
     int status = 0;
 
-    errno = 0;
+    RESET_ERRNO;
     if (getline(&buffer, &length, fp_for_read) == ERROR) {
         free(buffer);
         if (errno != 0) {
             fclose(fp_for_read);
-            exit_on_error(errno, "Reading an entire line from stream failed");
+            exit_on_error(errno, "getline() failed");
         }
-            // EOF found
+        // EOF found
         else {
             return 0;
         }
@@ -189,7 +191,7 @@ static int receive_message_from_server (void) {
             exit_on_error(0, "Reading filename from server response failed");
         }
 
-        errno = 0;
+        RESET_ERRNO;
         if (getline(&buffer, &length, fp_for_read) == ERROR) {
             free(buffer);
             if (errno != 0) {
@@ -248,7 +250,7 @@ static size_t read_file (FILE *fp ,char *filename, size_t length){
     size_t already_write = 0;
     char buffer [BUF_SIZE] = {'\0'};
 
-    errno = 0;
+    RESET_ERRNO;
     // Open the output-file with the given name
     FILE *output_file = fopen(filename,"w");
     if (output_file == NULL) {
@@ -278,7 +280,10 @@ static size_t read_file (FILE *fp ,char *filename, size_t length){
         already_write += to_write;
         length -= to_read;
     }
-    fclose(output_file);
+    int ret_fclose = fclose(output_file);
+    if (ret_fclose != 0) {
+        exit_on_error(0, "fclose () failed");
+    }
     return (already_write);
 }
 
@@ -298,7 +303,7 @@ static size_t read_file (FILE *fp ,char *filename, size_t length){
 */
 static int send_message_to_server(const char *message, const char *user, const char *img_url){
 
-    errno = 0;
+    RESET_ERRNO;
     FILE *fp_for_write = fdopen(socket_w,"w");
     if (fp_for_write == NULL) {
         fclose(fp_for_write);
@@ -312,34 +317,33 @@ static int send_message_to_server(const char *message, const char *user, const c
             exit_on_error(0, "fprintf() failed");
         }
 
-        errno = 0;
+        RESET_ERRNO;
         if (fflush(fp_for_write) == EOF){
             fclose(fp_for_write);
             exit_on_error(errno, "fflush() failed");
         }
 
-        errno = 0;
+        RESET_ERRNO;
         if (shutdown(socket_w,SHUT_WR) == ERROR){
             fclose(fp_for_write);
             exit_on_error(errno, "shutdown() failed");
         }
         fclose(fp_for_write);
-
-        // Sending message with img-URL
     }
+    // Sending message with img-URL
     else {
         if (fprintf(fp_for_write, "user=%s\nimg=%s\n%s\n", user, img_url, message) < 0) {
             fclose(fp_for_write);
             exit_on_error(0, "fprintf() failed");
         }
 
-        errno = 0;
+        RESET_ERRNO;
         if (fflush(fp_for_write) == EOF){
             fclose(fp_for_write);
             exit_on_error(errno, "fflush() failed");
         }
 
-        errno = 0;
+        RESET_ERRNO;
         if (shutdown(socket_w,SHUT_WR) != 0){
             fclose(fp_for_write);
             exit_on_error(errno, "shutdown() failed");
@@ -379,7 +383,7 @@ static int connect_with_server(const char *server_address, const char *server_po
      * getaddrinfo gets the server address, the port and hints (which includes the parameters set above).
      * The result get into the struct: serverinfo.
      */
-    errno = 0;
+    RESET_ERRNO;
     int ret_getaddrinfo = getaddrinfo(server_address, server_port, &hints, &serverinfo);
     if (ret_getaddrinfo != 0) {
         exit_on_error(errno, "getaddrinfo() failed");
